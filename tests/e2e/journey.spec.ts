@@ -132,6 +132,7 @@ test('first session to first saved reflection, then every screen', async ({ page
   await page.getByRole('button', { name: 'Dark' }).click();
   await page.goto('./#/');
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await page.waitForTimeout(400);
   await axe(page);
   await shot(page, '21-today-dark');
   await page.goto('./#/practise/w-saturday-move');
@@ -161,4 +162,25 @@ test('no horizontal overflow at 360px on any route', async ({ page }) => {
   await page.getByRole('button', { name: /write down what you actually know/i }).click();
   await noHorizontalOverflow(page);
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/23-scenario-360.png`, fullPage: true });
+});
+
+test('desktop width works and the app makes no third-party requests', async ({ page, baseURL }) => {
+  const origin = new URL(baseURL!).origin;
+  const foreign: string[] = [];
+  page.on('request', (r) => {
+    const u = new URL(r.url());
+    if (u.protocol.startsWith('http') && u.origin !== origin) foreign.push(r.url());
+  });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('./');
+  await page.getByRole('button', { name: 'Skip' }).click();
+  await page.getByRole('button', { name: 'Go to Today instead' }).click();
+  await expect(page.getByText('Today’s intention')).toBeVisible();
+  for (const r of ['#/practise', '#/practise/e-endless-polish', '#/journal', '#/library', '#/progress', '#/settings']) {
+    await page.goto(`./${r}`);
+    await expect(page.locator('main h1').first()).toBeVisible();
+    await noHorizontalOverflow(page);
+  }
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/24-desktop-settings.png` });
+  expect(foreign).toEqual([]);
 });

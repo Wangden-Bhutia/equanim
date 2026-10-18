@@ -61,7 +61,7 @@ export function Layout() {
                 to={to}
                 end={end}
                 className={({ isActive }) =>
-                  `flex flex-col items-center justify-center gap-1 h-16 text-[11.5px] font-medium transition-colors ${isActive ? 'text-accent' : 'text-muted hover:text-ink'}`
+                  `flex flex-col items-center justify-center gap-1 h-16 text-[11.5px] font-medium ${isActive ? 'text-accent' : 'text-muted hover:text-ink'}`
                 }
               >
                 {({ isActive }) => (

@@ -11,6 +11,8 @@ export default defineConfig({
     ...devices['Pixel 7'],
     baseURL: remote ?? 'http://localhost:4173/equanim/',
     viewport: { width: 390, height: 844 },
+    // Transitions are disabled so colour-contrast checks never sample mid-animation.
+    reducedMotion: 'reduce',
   },
   projects: [{ name: 'mobile-390', use: { browserName: 'chromium' } }],
   webServer: remote
