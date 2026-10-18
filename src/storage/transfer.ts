@@ -1,5 +1,5 @@
 import { migrate, validateAppData } from './schema';
-import type { AppData } from './types';
+import type { AppData } from '../types';
 
 export const EXPORT_APP = 'equanim';
 
@@ -15,14 +15,17 @@ export function exportFileName(now: Date = new Date()): string {
   return `equanim-backup-${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}.json`;
 }
 
-export interface DataSummary { intentions: number; reflections: number; attempts: number; scenarios: number; journal: number; library: number }
+export interface DataSummary {
+  intentions: number; reflections: number; practices: number; attempts: number; scenarios: number; journal: number; library: number;
+}
 
 export function summarize(d: AppData): DataSummary {
   return {
     intentions: d.intentions.length,
-    reflections: d.intentions.filter((i) => i.reflection).length,
+    reflections: d.reflections.length,
+    practices: d.practices.length,
     attempts: d.attempts.length,
-    scenarios: new Set(d.attempts.map((a) => a.scenarioId)).size,
+    scenarios: new Set(d.completions.map((c) => c.scenarioId)).size,
     journal: d.journal.length,
     library: d.library.length,
   };
@@ -57,30 +60,27 @@ export function parseImport(text: string): ParseResult {
   }
 }
 
-const later = (a: string, b: string) => (Date.parse(a) >= Date.parse(b) ? a : b);
-
-function mergeById<T extends { id: string; updatedAt?: string; at?: string }>(a: T[], b: T[]): T[] {
+function mergeById<T extends { id: string }>(a: T[], b: T[], time: (x: T) => string): T[] {
   const map = new Map<string, T>();
   for (const x of a) map.set(x.id, x);
   for (const y of b) {
     const x = map.get(y.id);
-    if (!x) map.set(y.id, y);
-    else {
-      const tx = x.updatedAt ?? x.at ?? '';
-      const ty = y.updatedAt ?? y.at ?? '';
-      map.set(y.id, later(ty, tx) === ty && ty !== tx ? y : x);
-    }
+    if (!x || Date.parse(time(y)) > Date.parse(time(x))) map.set(y.id, y);
   }
   return [...map.values()];
 }
 
-/** Merge imported data into current data. Current settings are kept. One intention per day: the more recently updated wins. */
-export function mergeData(current: AppData, incoming: AppData): AppData {
-  const byDate = new Map<string, AppData['intentions'][number]>();
-  for (const i of [...current.intentions, ...incoming.intentions]) {
+function onePerDay<T extends { date: string; updatedAt: string }>(a: T[], b: T[]): T[] {
+  const byDate = new Map<string, T>();
+  for (const i of [...a, ...b]) {
     const prev = byDate.get(i.date);
     if (!prev || Date.parse(i.updatedAt) > Date.parse(prev.updatedAt)) byDate.set(i.date, i);
   }
+  return [...byDate.values()].sort((x, y) => x.date.localeCompare(y.date));
+}
+
+/** Merge imported data into current data. Current settings and in-progress item are kept. One intention and one evening reflection per day: the more recently updated wins. */
+export function mergeData(current: AppData, incoming: AppData): AppData {
   const lib = new Map<string, AppData['library'][number]>();
   for (const r of [...current.library, ...incoming.library]) lib.set(`${r.itemId}|${r.kind}|${r.at}`, r);
   const onboard = [current.onboardingCompletedAt, incoming.onboardingCompletedAt].filter((x): x is string => !!x).sort()[0] ?? null;
@@ -88,9 +88,12 @@ export function mergeData(current: AppData, incoming: AppData): AppData {
     ...current,
     createdAt: [current.createdAt, incoming.createdAt].sort()[0] as string,
     onboardingCompletedAt: onboard,
-    intentions: [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date)),
-    attempts: mergeById(current.attempts, incoming.attempts),
-    journal: mergeById(current.journal, incoming.journal),
+    intentions: onePerDay(current.intentions, incoming.intentions),
+    reflections: onePerDay(current.reflections, incoming.reflections),
+    practices: mergeById(current.practices, incoming.practices, (p) => p.completedAt),
+    attempts: mergeById(current.attempts, incoming.attempts, (x) => x.at),
+    completions: mergeById(current.completions, incoming.completions, (x) => x.at),
+    journal: mergeById(current.journal, incoming.journal, (x) => x.updatedAt),
     library: [...lib.values()],
   };
 }

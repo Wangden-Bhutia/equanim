@@ -1,11 +1,12 @@
 import { useRef, useState } from 'react';
 import { Download, Upload, RotateCcw, Trash2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../app/store';
-import { exportFileName, exportJson, parseImport, summarize, type DataSummary } from '../lib/transfer';
-import { formatShort } from '../lib/dates';
-import type { AppData, ThemePreference } from '../lib/types';
+import { exportFileName, exportJson, parseImport, summarize, type DataSummary } from '../storage/transfer';
+import { formatShort } from '../engine/dates';
+import type { AppData, ThemePreference } from '../types';
 import { ConfirmDialog, PageHeader } from '../components/ui';
+import { InstallApp } from '../components/InstallApp';
 
 function readFileText(file: File): Promise<string> {
   if (typeof file.text === 'function') return file.text();
@@ -20,11 +21,51 @@ function readFileText(file: File): Promise<string> {
 function SummaryList({ s }: { s: DataSummary }) {
   return (
     <ul className="mt-2 text-[15px] text-ink space-y-0.5">
-      <li>{s.intentions} intentions ({s.reflections} with reflections)</li>
-      <li>{s.scenarios} scenarios explored ({s.attempts} responses)</li>
+      <li>{s.intentions} intentions and {s.reflections} evening reflections</li>
+      <li>{s.practices} daily practices completed</li>
+      <li>{s.scenarios} scenario completions ({s.attempts} responses explored)</li>
       <li>{s.journal} journal entries</li>
-      <li>{s.library} library records</li>
+      <li>{s.library} reading records</li>
     </ul>
+  );
+}
+
+const COPY_LABEL = { unreadable: 'Unreadable data', 'pre-migration': 'Original before upgrade', recovered: 'Original before recovery', 'set-aside': 'Edits set aside', unsaved: 'Unsaved change' } as const;
+
+function download(name: string, text: string) {
+  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/** Lists safety copies kept on this device so they can be saved as files. They are never deleted automatically. */
+function RecoveryCopies() {
+  const { safetyCopies, readSafetyCopy } = useStore();
+  const copies = safetyCopies();
+  if (copies.length === 0) return null;
+  return (
+    <section className="card" aria-labelledby="rec-h">
+      <h2 id="rec-h" className="eyebrow">Recovery copies</h2>
+      <p className="text-[15px] text-muted mt-1">Equanim keeps an exact copy of your saved data before upgrading it or recovering from damaged values. When the same item was changed in two tabs at once, the version not kept is saved as "Edits set aside". A change that could not be saved is kept as "Unsaved change". These copies stay on this device until you erase all data. An "original before upgrade" copy can be imported here like a backup.</p>
+      <ul className="mt-3 space-y-2">
+        {copies.map((c) => (
+          <li key={c.key} className="flex items-center justify-between gap-3 text-[15px]">
+            <span className="min-w-0">
+              <span className="block font-medium">{COPY_LABEL[c.kind]}</span>
+              <span className="block text-[13px] text-muted">{c.at ? formatShort(new Date(c.at).toISOString()) : 'Date unknown'} · {Math.max(1, Math.round(c.size / 1024))} KB</span>
+            </span>
+            <button className="btn-secondary !min-h-[44px] shrink-0" onClick={() => { const raw = readSafetyCopy(c.key); if (raw !== null) download(`equanim-${c.kind}-${c.at || 'copy'}.json`, raw); }}>
+              <Download size={16} aria-hidden="true" />Download<span className="sr-only"> {COPY_LABEL[c.kind].toLowerCase()}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -80,7 +121,7 @@ export function Settings() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Settings & data" back="/more" />
+      <PageHeader title="Settings and Data" back="/more" />
 
       {status && <p role="status" className="card !p-4 bg-accentsoft border-accent/30 text-[15px]">{status}</p>}
 
@@ -108,15 +149,23 @@ export function Settings() {
           </div>
           <button type="button" role="switch" aria-checked={data.settings.streaksEnabled} aria-labelledby="streak-l" aria-describedby="streak-d"
             onClick={() => updateSettings({ streaksEnabled: !data.settings.streaksEnabled })}
-            className={`relative shrink-0 w-12 h-7 rounded-full transition-colors mt-1 ${data.settings.streaksEnabled ? 'bg-accent' : 'bg-line'}`}>
-            <span className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white shadow transition-transform ${data.settings.streaksEnabled ? 'translate-x-5' : ''}`} />
+            className="shrink-0 min-h-[44px] min-w-[56px] flex items-center justify-center rounded-full">
+            <span aria-hidden="true" className={`relative block w-12 h-7 rounded-full transition-colors ${data.settings.streaksEnabled ? 'bg-accent' : 'bg-line'}`}>
+              <span className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white shadow transition-transform ${data.settings.streaksEnabled ? 'translate-x-5' : ''}`} />
+            </span>
           </button>
         </div>
       </section>
 
+      <section className="card" aria-labelledby="inst-h">
+        <h2 id="inst-h" className="eyebrow">App</h2>
+        <p className="text-[15px] text-muted mt-1 mb-4">Install Equanim to open it from its own icon and use it offline. Installing changes nothing about where your data is kept.</p>
+        <InstallApp variant="card" />
+      </section>
+
       <section className="card" aria-labelledby="data-h">
         <h2 id="data-h" className="eyebrow">Your data</h2>
-        <p className="text-[15px] text-muted mt-1">Stored only on this device.</p>
+        <p className="text-[15px] text-muted mt-1">Everything is stored in this browser on this device, with no account or server. Clearing browser data, or using another browser or device, means your entries will not be there, so export a backup if they matter to you. The backup file is plain, unencrypted JSON. <Link to="/privacy" className="underline">Privacy and Storage</Link></p>
         <SummaryList s={summarize(data)} />
         <div className="mt-5 flex flex-col gap-3">
           <button className="btn-secondary" onClick={doExport}><Download size={17} aria-hidden="true" />Export backup (JSON)</button>
@@ -128,6 +177,8 @@ export function Settings() {
         </div>
         {importError && <p role="alert" className="text-danger text-sm mt-3">{importError}</p>}
       </section>
+
+      <RecoveryCopies />
 
       <section className="card border-danger/30" aria-labelledby="reset-h">
         <h2 id="reset-h" className="eyebrow !text-danger">Erase everything</h2>

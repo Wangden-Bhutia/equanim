@@ -4,7 +4,7 @@ import { CheckCircle2, ChevronRight } from 'lucide-react';
 import { useStore } from '../app/store';
 import { DOMAIN_LIST } from '../data/domains';
 import { SCENARIOS } from '../data/scenarios';
-import { DOMAIN_IDS, type DomainId } from '../lib/types';
+import { DOMAIN_IDS, type DomainId } from '../types';
 import { DomainTag, PageHeader } from '../components/ui';
 
 export function Practise() {
@@ -13,7 +13,7 @@ export function Practise() {
   const raw = params.get('domain');
   const initial = raw && (DOMAIN_IDS as string[]).includes(raw) ? (raw as DomainId) : 'all';
   const [filter, setFilter] = useState<DomainId | 'all'>(initial);
-  const explored = new Set(data.attempts.map((a) => a.scenarioId));
+  const explored = new Set(data.completions.map((c) => c.scenarioId));
   const list = SCENARIOS.filter((s) => filter === 'all' || s.domain === filter);
 
   const choose = (f: DomainId | 'all') => {
@@ -23,7 +23,7 @@ export function Practise() {
 
   return (
     <div>
-      <PageHeader title="Practise" intro="Everyday situations. Choose a response, then see what it protects and what it costs. Explore as many responses as you like." />
+      <PageHeader title="Practise" intro="Everyday situations across four domains. Choose a response, read what it may accomplish and what it risks, then reflect. There is rarely one obviously right answer." />
       <div className="flex flex-wrap gap-2 mb-5" role="group" aria-label="Filter by area">
         {[{ id: 'all' as const, name: 'All' }, ...DOMAIN_LIST].map((d) => (
           <button
@@ -31,13 +31,14 @@ export function Practise() {
             type="button"
             aria-pressed={filter === d.id}
             onClick={() => choose(d.id)}
-            className={`shrink-0 rounded-full border px-4 min-h-[40px] text-sm font-medium ${filter === d.id ? 'bg-accent text-onaccent border-accent' : 'border-line text-muted bg-surface'}`}
+            className={`shrink-0 rounded-full border px-4 min-h-[44px] text-sm font-medium ${filter === d.id ? 'chip-on' : 'chip-off'}`}
           >
             {d.name}
           </button>
         ))}
       </div>
-      <p className="text-sm text-muted mb-3">{list.filter((s) => explored.has(s.id)).length} of {list.length} explored</p>
+      {filter !== 'all' && <p className="text-[15px] mb-3">{DOMAIN_LIST.find((d) => d.id === filter)?.description}</p>}
+      <p className="text-sm text-muted mb-3">{list.filter((s) => explored.has(s.id)).length} of {list.length} completed</p>
       <ul className="space-y-3">
         {list.map((s) => (
           <li key={s.id}>
@@ -47,7 +48,7 @@ export function Practise() {
                 <p className="font-serif text-[18px] font-semibold mt-1">{s.title}</p>
               </div>
               {explored.has(s.id) ? (
-                <CheckCircle2 size={20} className="text-accent shrink-0" aria-label="Explored" />
+                <CheckCircle2 size={20} className="text-accent shrink-0" aria-label="Completed" />
               ) : (
                 <ChevronRight size={20} className="text-muted shrink-0" aria-hidden="true" />
               )}

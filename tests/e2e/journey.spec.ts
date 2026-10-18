@@ -2,11 +2,11 @@ import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import fs from 'node:fs';
 
-const SHOTS = process.env.SHOTS_DIR; // set to save phone screenshots
-const shot = async (page: Page, name: string) => {
+const SHOTS = process.env.SHOTS_DIR; // set to save screenshots
+const shot = async (page: Page, name: string, fullPage = false) => {
   if (!SHOTS) return;
   fs.mkdirSync(SHOTS, { recursive: true });
-  await page.screenshot({ path: `${SHOTS}/${name}.png` });
+  await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage });
 };
 
 async function noHorizontalOverflow(page: Page) {
@@ -20,99 +20,153 @@ async function axe(page: Page) {
   expect(serious.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([]);
 }
 
-test('first session to first saved reflection, then every screen', async ({ page }) => {
+const primary = (page: Page) => page.getByRole('navigation', { name: 'Primary' }).locator('visible=true');
+
+test('[SIMULATED phone: Pixel 7 profile in Chromium, not a real device] onboarding sample journey, a full day of practice, every screen in light and dark', async ({ page, context }) => {
   await page.goto('./');
   await page.evaluate(() => localStorage.clear());
   await page.goto('./');
 
-  // Onboarding
+  // Onboarding information steps
   await expect(page.getByRole('heading', { name: 'Clarity in the midst of life.' })).toBeVisible();
   await noHorizontalOverflow(page);
   await axe(page);
   await shot(page, '01-onboarding-welcome');
   await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.getByRole('heading', { name: /practice takes a few minutes/i })).toBeVisible();
-  await shot(page, '02-onboarding-sample-day');
+  await expect(page.getByText(/not a replacement for professional mental-health support/)).toBeVisible();
+  await shot(page, '02-onboarding-not-therapy');
   await page.getByRole('button', { name: 'Continue' }).click();
-  await shot(page, '03-onboarding-privacy');
+  await shot(page, '03-onboarding-five-sections');
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByLabel(/what should equanim call you/i).fill('Asha');
-  await page.getByRole('button', { name: 'Begin first practice' }).click();
+  await shot(page, '04-onboarding-storage');
+  await page.getByRole('button', { name: 'Continue' }).click();
 
-  // First practice
+  // Sample journey: orientation → intention → scenario + reflection → progress entry
+  await expect(page.getByText(/1 of 4 · Orientation/)).toBeVisible();
+  await shot(page, '05-journey-orientation');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByText('Ask before assuming').click();
+  await shot(page, '06-journey-intention');
+  await axe(page);
+  await page.getByRole('button', { name: 'Set intention and continue' }).click();
   await expect(page.getByRole('heading', { name: 'The one-word reply' })).toBeVisible();
-  await shot(page, '04-first-scenario');
+  await shot(page, '07-journey-scenario');
   await page.getByRole('button', { name: /notice the story forming/i }).click();
   await expect(page.getByRole('heading', { name: 'Observing the story' })).toBeVisible();
   await page.getByRole('heading', { name: 'Observing the story' }).scrollIntoViewIfNeeded();
-  await shot(page, '05-scenario-feedback');
+  await shot(page, '08-scenario-feedback');
   await axe(page);
-  await page.getByRole('link', { name: /continue to today/i }).click();
+  await page.getByLabel(/personal note/i).fill('He replied "ok." I decided he was annoyed. He was in a meeting.');
+  await page.getByRole('heading', { name: 'Why this matters' }).scrollIntoViewIfNeeded();
+  await shot(page, '09-scenario-reflection');
+  await page.getByRole('button', { name: 'Mark scenario complete' }).click();
+  await page.getByRole('link', { name: /see your first progress entry/i }).click();
+  await expect(page.getByRole('heading', { name: 'Your first progress entry.' })).toBeVisible();
+  await axe(page);
+  await shot(page, '10-journey-progress-entry');
+  await page.getByRole('link', { name: 'Go to Today' }).click();
 
-  // Today: intention
-  await expect(page.getByRole('heading', { name: /, Asha\./ })).toBeVisible();
-  await shot(page, '06-today-empty');
-  await page.getByText('Words', { exact: true }).click();
-  await page.getByLabel('Intention', { exact: true }).fill('Before agreeing to anything today, pause and check whether I can really do it.');
-  await page.getByRole('button', { name: 'Set intention' }).click();
-  await expect(page.getByText('Before agreeing to anything today')).toBeVisible();
-
-  // Evening reflection
-  await page.getByRole('button', { name: 'Reflect on today' }).click();
-  await page.getByText('I noticed afterwards').click();
-  await page.getByLabel(/what did you observe/i).fill('Said yes to a meeting, then realised I had no time.');
-  await page.getByRole('button', { name: 'Save reflection' }).click();
-  await expect(page.getByText('I noticed afterwards')).toBeVisible();
+  // Today
+  await expect(page.getByText('Morning intention')).toBeVisible();
+  await expect(page.getByText('Ask one clarifying question instead of guessing')).toBeVisible();
+  await noHorizontalOverflow(page);
+  await axe(page);
+  await shot(page, '11-today');
+  await page.getByRole('button', { name: 'Begin practice' }).click();
+  await page.locator('#pr-resp').fill('Tried it on the bus.');
   await page.reload();
-  await expect(page.getByText('Before agreeing to anything today')).toBeVisible();
+  await expect(page.getByText('Continue where you left off')).toBeVisible();
+  await shot(page, '12-today-continue');
+  await page.getByRole('button', { name: 'Mark practice complete' }).click();
+  await page.getByRole('button', { name: 'Reflect on today' }).click();
+  await page.getByLabel('What happened?').fill('Said yes to a meeting, then realised I had no time.');
+  await page.getByLabel('What will I try next time?').fill('Pause before agreeing.');
+  await page.locator('#evening-reflection').scrollIntoViewIfNeeded();
+  await shot(page, '13-today-evening-reflection');
+  await page.getByRole('button', { name: 'Save reflection' }).click();
+  await page.reload();
   await expect(page.getByText('Said yes to a meeting')).toBeVisible();
-  await shot(page, '07-today-with-intention');
+  await shot(page, '14-today-full', true);
   await axe(page);
 
-  // Practise list
-  await page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Practise' }).click();
+  // Practise
+  await primary(page).getByRole('link', { name: 'Practise' }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Practise' })).toBeVisible();
   await noHorizontalOverflow(page);
-  await shot(page, '08-practise');
   await axe(page);
+  await shot(page, '15-practise');
+  // Revisit history
+  await page.goto('./#/practise/p-one-word-reply');
+  await expect(page.getByText('Your history with this scenario')).toBeVisible();
+  await page.getByText('Your history with this scenario').scrollIntoViewIfNeeded();
+  await shot(page, '16-scenario-history');
 
-  // Journal
-  await page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Journal' }).click();
-  await shot(page, '09-journal-empty');
+  // Journal: three types
+  await primary(page).getByRole('link', { name: 'Journal' }).click();
+  await shot(page, '17-journal-empty');
   await page.getByRole('link', { name: 'New entry' }).click();
-  await page.getByLabel('What happened').fill('My manager replied "ok." to my update.');
-  await page.getByLabel('The meaning I added').fill('She was unhappy with my work.');
-  await page.getByLabel('How I responded').fill('Spent an hour rewriting it.');
-  await shot(page, '10-journal-editor');
+  await shot(page, '18-journal-types');
+  await page.getByRole('link', { name: /Incident reflection/ }).click();
+  await page.getByLabel('What happened?').fill('My manager replied "ok." to my update.');
+  await page.getByLabel('What did I interpret or assume?').fill('That she was unhappy with my work.');
+  await page.getByLabel('What else might explain it?').fill('She was between meetings.');
+  await shot(page, '19-journal-incident');
   await axe(page);
   await page.getByRole('button', { name: 'Save entry' }).click();
-  await expect(page.getByText('She was unhappy with my work.')).toBeVisible();
-  await shot(page, '11-journal-entry');
+  await expect(page.getByText('That she was unhappy with my work.')).toBeVisible();
+  await shot(page, '20-journal-entry');
+  // Edit the entry
+  await page.getByRole('link', { name: 'Edit' }).click();
+  await page.getByLabel('What, if anything, should I do next?').fill('Ask how she prefers updates.');
+  await page.getByRole('button', { name: 'Save entry' }).click();
+  await expect(page.getByText('Ask how she prefers updates.')).toBeVisible();
+  await page.goto('./#/journal/new?type=daily');
+  await page.getByLabel('Where did I respond deliberately today?').fill('In the standup.');
+  await page.getByRole('button', { name: 'Save entry' }).click();
+  await page.goto('./#/journal/new?type=free');
+  await page.getByLabel('Reflection').fill('A quieter day.');
+  await page.getByRole('button', { name: 'Save entry' }).click();
+  await primary(page).getByRole('link', { name: 'Journal' }).click();
+  await expect(page.getByText('A quieter day.')).toBeVisible();
+  await shot(page, '21-journal-list');
 
   // Library
-  await page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Library' }).click();
-  await shot(page, '12-library');
-  await page.getByRole('link', { name: /A boundary is not a wall/ }).click();
-  await expect(page.getByRole('heading', { name: 'A boundary is not a wall' })).toBeVisible();
-  await shot(page, '13-library-essay');
+  await primary(page).getByRole('link', { name: 'Library' }).click();
+  await shot(page, '22-library');
+  await page.getByRole('link', { name: /Boundaries, Responsibility and Respect/ }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Boundaries, Responsibility and Respect' })).toBeVisible();
+  await shot(page, '23-library-essay');
   await axe(page);
+  await page.getByRole('button', { name: 'Mark as read' }).click();
   await page.getByRole('button', { name: 'I tried this' }).click();
 
   // Progress
-  await page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Progress' }).click();
-  await expect(page.getByText('1/24')).toBeVisible();
-  await shot(page, '14-progress');
+  await primary(page).getByRole('link', { name: 'Progress' }).click();
+  await expect(page.getByText('1/35')).toBeVisible();
+  await expect(page.getByText('readings completed')).toBeVisible();
   await axe(page);
+  await shot(page, '24-progress', true);
 
-  // Secondary pages
-  for (const [route, heading, name] of [
-    ['#/settings', 'Settings & data', '15-settings'],
-    ['#/framework', 'The framework', '16-framework'],
-    ['#/about', 'About Equanim', '17-about'],
-    ['#/references', 'References', '18-references'],
-    ['#/privacy', 'Privacy', '19-privacy'],
-    ['#/more', 'More', '20-more'],
-  ] as const) {
+  // Close the app and open it again: everything is still there.
+  const url = page.url().split('#')[0];
+  await page.close();
+  page = await context.newPage();
+  await page.goto(`${url}#/journal`);
+  await expect(page.getByText('A quieter day.')).toBeVisible();
+  await page.goto(`${url}#/`);
+  await expect(page.getByText('Said yes to a meeting')).toBeVisible();
+
+  // Secondary pages with their specified names
+  const secondary = [
+    ['#/more', 'More', '25-more'],
+    ['#/about', 'About Equanim', '26-about'],
+    ['#/framework', 'Practice Framework', '27-framework'],
+    ['#/references', 'Reading and References', '28-references'],
+    ['#/settings', 'Settings and Data', '29-settings'],
+    ['#/privacy', 'Privacy and Storage', '30-privacy'],
+  ] as const;
+  for (const [route, heading, name] of secondary) {
     await page.goto(`./${route}`);
     await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible();
     await noHorizontalOverflow(page);
@@ -123,48 +177,68 @@ test('first session to first saved reflection, then every screen', async ({ page
   // Export produces a valid file
   await page.goto('./#/settings');
   const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: /export backup/i }).click()]);
-  const path = await download.path();
-  const json = JSON.parse(fs.readFileSync(path!, 'utf8'));
+  const json = JSON.parse(fs.readFileSync((await download.path())!, 'utf8'));
   expect(json.app).toBe('equanim');
-  expect(json.data.journal).toHaveLength(1);
+  expect(json.data.schemaVersion).toBe(2);
+  expect(json.data.journal).toHaveLength(3);
+  expect(json.data.reflections).toHaveLength(1);
 
-  // Dark theme
+  // Dark theme: same screens
   await page.getByRole('button', { name: 'Dark' }).click();
-  await page.goto('./#/');
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-  await page.waitForTimeout(400);
-  await axe(page);
-  await shot(page, '21-today-dark');
+  await page.waitForTimeout(300);
+  const dark = [
+    ['#/', '31-dark-today'],
+    ['#/practise', '32-dark-practise'],
+    ['#/journal', '34-dark-journal'],
+    ['#/library', '35-dark-library'],
+    ['#/library/section-speech', '36-dark-library-section'],
+    ['#/progress', '37-dark-progress'],
+    ['#/framework', '38-dark-framework'],
+    ['#/settings', '39-dark-settings'],
+  ] as const;
+  for (const [route, name] of dark) {
+    await page.goto(`./${route}`);
+    await expect(page.locator('main h1').first()).toBeVisible();
+    await page.waitForTimeout(150);
+    await axe(page);
+    await shot(page, name);
+  }
   await page.goto('./#/practise/w-saturday-move');
-  await page.getByRole('button', { name: /clear, kind no|not able to this saturday/i }).click();
-  await page.getByRole('heading', { name: 'Clear, kind no' }).scrollIntoViewIfNeeded();
-  await shot(page, '22-scenario-dark');
+  await page.getByRole('group', { name: 'Possible responses' }).getByRole('button').nth(1).click();
+  await page.locator('[aria-labelledby="fb-h"]').scrollIntoViewIfNeeded();
+  await axe(page);
+  await shot(page, '33-dark-scenario-feedback');
 });
 
-test('no horizontal overflow at 360px on any route', async ({ page }) => {
+test('no horizontal overflow at 360px on any route, with 1.0 data migrated', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 780 });
   await page.goto('./');
+  // Seed Equanim 1.0 (schema v1) data to confirm the live upgrade path works in a real browser.
   await page.evaluate(() => {
+    const t = new Date().toISOString();
     localStorage.setItem('equanim:data', JSON.stringify({
-      schemaVersion: 1, createdAt: new Date().toISOString(), onboardingCompletedAt: new Date().toISOString(),
-      settings: { displayName: 'Asha', streaksEnabled: true, theme: 'light' }, intentions: [], attempts: [], journal: [], library: [],
+      schemaVersion: 1, createdAt: t, onboardingCompletedAt: t,
+      settings: { displayName: 'Asha', streaksEnabled: true, theme: 'light' },
+      intentions: [{ id: 'i1', date: t.slice(0, 10), domain: 'words', text: 'Old intention', createdAt: t, updatedAt: t, reflection: null }],
+      attempts: [{ id: 'a1', scenarioId: 'p-one-word-reply', optionId: 'a', at: t }],
+      journal: [{ id: 'j1', createdAt: t, updatedAt: t, domain: 'perspective', scenarioId: null, situation: 'An old entry', story: '', response: '', nextTime: '', note: '' }],
+      library: [],
     }));
   });
   await page.reload();
-  await expect(page.getByRole('heading', { name: /, Asha\./ })).toBeVisible();
-  const routes = ['#/', '#/practise', '#/practise/a-landlord-call', '#/journal', '#/journal/new', '#/library', '#/library/section-perspective', '#/progress', '#/more', '#/settings', '#/about', '#/framework', '#/references', '#/privacy', '#/nope'];
+  await expect(page.locator('main h1').first()).toBeVisible();
+  await page.goto('./#/journal');
+  await expect(page.getByText('An old entry')).toBeVisible();
+  const routes = ['#/', '#/practise', '#/practise/a-landlord-call', '#/practise/n-group-pressure', '#/journal', '#/journal/new', '#/journal/new?type=incident', '#/library', '#/library/section-personalisation', '#/progress', '#/more', '#/settings', '#/about', '#/framework', '#/references', '#/privacy', '#/nope'];
   for (const r of routes) {
     await page.goto(`./${r}`);
     await expect(page.locator('main h1').first()).toBeVisible();
     await noHorizontalOverflow(page);
   }
-  await page.goto('./#/practise/a-landlord-call');
-  await page.getByRole('button', { name: /write down what you actually know/i }).click();
-  await noHorizontalOverflow(page);
-  if (SHOTS) await page.screenshot({ path: `${SHOTS}/23-scenario-360.png`, fullPage: true });
 });
 
-test('desktop width works and the app makes no third-party requests', async ({ page, baseURL }) => {
+test('desktop sidebar, and the app makes no third-party requests', async ({ page, baseURL }) => {
   const origin = new URL(baseURL!).origin;
   const foreign: string[] = [];
   page.on('request', (r) => {
@@ -174,13 +248,36 @@ test('desktop width works and the app makes no third-party requests', async ({ p
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto('./');
   await page.getByRole('button', { name: 'Skip' }).click();
-  await page.getByRole('button', { name: 'Go to Today instead' }).click();
-  await expect(page.getByText('Today’s intention')).toBeVisible();
+  await expect(page.getByText('Morning intention')).toBeVisible();
+  const sidebar = page.getByRole('complementary', { name: 'Sidebar' });
+  await expect(sidebar).toBeVisible();
+  for (const name of ['Today', 'Practise', 'Journal', 'Library', 'Progress', 'About Equanim', 'Practice Framework', 'Reading and References', 'Settings and Data', 'Privacy and Storage']) {
+    await expect(sidebar.getByRole('link', { name, exact: true })).toBeVisible();
+  }
+  await axe(page);
+  await shot(page, '40-desktop-today');
   for (const r of ['#/practise', '#/practise/e-endless-polish', '#/journal', '#/library', '#/progress', '#/settings']) {
     await page.goto(`./${r}`);
     await expect(page.locator('main h1').first()).toBeVisible();
     await noHorizontalOverflow(page);
   }
-  if (SHOTS) await page.screenshot({ path: `${SHOTS}/24-desktop-settings.png` });
+  await sidebar.getByRole('link', { name: 'Practise', exact: true }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Practise' })).toBeVisible();
+  await shot(page, '41-desktop-practise');
   expect(foreign).toEqual([]);
+});
+
+test('works offline after the first visit', async ({ page, context, baseURL }) => {
+  test.skip(!!process.env.BASE_URL && !baseURL!.startsWith('https'), 'service workers need a secure origin');
+  await page.goto('./');
+  await page.evaluate(async () => { await navigator.serviceWorker.ready; });
+  await page.waitForFunction(() => !!navigator.serviceWorker.controller);
+  await page.getByRole('button', { name: 'Skip' }).click();
+  await expect(page.getByText('Morning intention')).toBeVisible();
+  await context.setOffline(true);
+  await page.reload();
+  await expect(page.getByText('Morning intention')).toBeVisible();
+  await page.goto('./#/library/essay-difficult-day');
+  await expect(page.getByRole('heading', { level: 1, name: 'Learning from a Difficult Day' })).toBeVisible();
+  await context.setOffline(false);
 });
