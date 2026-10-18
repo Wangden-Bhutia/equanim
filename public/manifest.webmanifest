@@ -1,0 +1,12 @@
+{
+  "id": "/equanim/",
+  "name": "Equanim",
+  "short_name": "Equanim",
+  "description": "Clarity in the midst of life.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F6F3EC",
+  "theme_color": "#2E5E5A",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

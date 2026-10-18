@@ -1,0 +1,82 @@
+@import '@fontsource/source-serif-4/400.css';
+@import '@fontsource/source-serif-4/600.css';
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Design tokens: Equanim. Calm parchment light theme and a deep slate dark theme. */
+:root {
+  --bg: 246 243 236;          /* #F6F3EC parchment */
+  --surface: 255 253 248;     /* #FFFDF8 */
+  --surface-2: 238 233 223;   /* #EEE9DF */
+  --ink: 30 38 41;            /* #1E2629 */
+  --ink-muted: 84 97 104;     /* #546168 */
+  --line: 222 215 201;        /* #DED7C9 */
+  --accent: 46 94 90;         /* #2E5E5A deep sage */
+  --on-accent: 255 255 255;
+  --accent-soft: 221 233 228; /* #DDE9E4 */
+  --clay: 138 75 34;          /* #8A4B22 */
+  --clay-soft: 243 227 211;   /* #F3E3D3 */
+  --danger: 160 48 48;        /* #A03030 */
+  --d-words: 61 90 128;       /* slate blue */
+  --d-perspective: 46 107 94; /* sage */
+  --d-assumptions: 138 90 43; /* ochre */
+  --d-effort: 122 78 110;     /* plum */
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --bg: 20 26 28;
+  --surface: 28 36 39;
+  --surface-2: 36 46 50;
+  --ink: 236 232 224;
+  --ink-muted: 168 178 181;
+  --line: 50 61 65;
+  --accent: 140 194 184;
+  --on-accent: 14 32 29;
+  --accent-soft: 34 56 58;
+  --clay: 222 160 118;
+  --clay-soft: 58 42 32;
+  --danger: 240 128 128;
+  --d-words: 140 172 214;
+  --d-perspective: 132 196 178;
+  --d-assumptions: 214 170 118;
+  --d-effort: 204 160 194;
+  color-scheme: dark;
+}
+
+html, body, #root { min-height: 100%; }
+body {
+  @apply bg-bg text-ink font-sans antialiased;
+  font-size: 16px;
+  line-height: 1.55;
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+h1, h2, h3 { @apply font-serif text-ink; letter-spacing: -0.01em; }
+:focus-visible { outline: 2px solid rgb(var(--accent)); outline-offset: 2px; border-radius: 0.5rem; }
+
+@layer components {
+  .card { @apply bg-surface border border-line rounded-card shadow-soft p-5; }
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-full px-5 min-h-[44px] text-[15px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed; }
+  .btn-primary { @apply btn bg-accent text-onaccent hover:opacity-90; }
+  .btn-secondary { @apply btn bg-surface text-ink border border-line hover:bg-surface2; }
+  .btn-ghost { @apply btn text-accent hover:bg-accentsoft px-3; }
+  .btn-danger { @apply btn bg-danger text-white hover:opacity-90; }
+  .field { @apply w-full rounded-xl border border-line bg-surface px-4 py-3 text-[16px] text-ink placeholder:text-muted/80 focus:border-accent focus:outline-none; }
+  .label { @apply block text-sm font-medium text-ink mb-1.5; }
+  .eyebrow { @apply text-xs font-semibold uppercase tracking-[0.08em] text-muted; }
+  .prose-eq p { @apply mb-4 leading-relaxed; }
+  .prose-eq p:last-child { @apply mb-0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
