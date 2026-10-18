@@ -1,3 +1,5 @@
+import { useEffect } from 'react';
+import { startInstallListener } from '../engine/install';
 import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { StoreProvider, useStore } from './store';
 import type { StorageAdapter } from '../storage/storage';
@@ -48,6 +50,7 @@ function Gate() {
 }
 
 export function App({ adapter }: { adapter?: StorageAdapter }) {
+  useEffect(() => { startInstallListener(); }, []);
   return (
     <ErrorBoundary>
       <StoreProvider adapter={adapter}>

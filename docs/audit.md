@@ -244,3 +244,31 @@ Checks run on this branch: `npm run typecheck`, `npm run lint`, `npm test` (54 V
 1. Do a manual TalkBack pass on an Android phone in Chrome, and fix what it finds.
 2. Have a second reader review the content for tone, cultural fit and originality.
 3. Move storage to IndexedDB behind `StorageAdapter`, then begin the Capacitor wrapper with a Preferences adapter.
+
+---
+
+# Pre-merge audit (brief: `docs/pre-merge-audit-brief.md`)
+
+## Data safety: what was found and fixed on this branch
+Before this audit, the branch's 1.0 → 1.1 upgrade had these problems. None of them had reached the live site, because the branch was never merged.
+
+| Risk | Fix |
+|---|---|
+| A successful migration overwrote the 1.0 data with no copy kept | Before migrating, the exact raw value is written to `equanim:pre-migration:v<from>:<time>` and read back to check it. Settings › Recovery copies offers it as a download. |
+| If that copy could not be written (storage full), the next save would replace the original | The repository locks; saves are refused, and the user is told. The original is untouched. |
+| One malformed record made the whole dataset "unreadable" (empty app) | `salvage()` keeps every valid record and drops only bad ones. The original is kept as `equanim:recovered-original:*` and the user is told how many records were set aside. |
+| Meaning changes in migration | 1.0 check-in outcomes are kept verbatim as `legacyCheckIn`, shown with their original question. Journal "next time"/"anything else" keep their own labels. A 1.0 "read" becomes both opened and completed. |
+| Two tabs overwriting each other | Tabs reload on the `storage` event. |
+
+Remaining: a still-open **1.0 tab** (old code) can write v1 data after the upgrade. The next load migrates it again, so entries added in 1.1 *in another tab during that window* could be lost. This is low likelihood and documented.
+
+## Accessibility fixes in this audit
+- The skip link broke hash routing.
+- The streak switch target was 28px; it is now 44px.
+- Radio-card and field focus was invisible or weak.
+- Focus was lost when a button disappeared after an action. It now moves to a confirmation that is announced.
+- The confirmation dialog had no Tab trap; there is now a shared `Dialog` with trap, Escape and focus return.
+- axe: 0 violations on every screen, light and dark. A keyboard review of each core screen checks that every one of the first 25 tab stops has a visible focus indicator.
+
+## Install App
+Covered: manifest (192, 512, 512 maskable, svg), service worker scope `/equanim/`, and Chromium installability errors = none (headless check). The prompt is held and offered only from the button. Accept, cancel and consumed states, `appinstalled`, standalone detection, the iOS guide by browser, and guidance for unsupported browsers are all handled. **The real prompt and iOS flow were not tried on devices** (see `docs/manual-testing.md`).

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowRight, Check, CheckCircle2, ChevronRight } from 'lucide-react';
 import { useStore } from '../app/store';
@@ -7,6 +7,7 @@ import { SCENARIO_BY_ID } from '../data/scenarios';
 import { DomainTag, PageHeader, Prose } from '../components/ui';
 import { formatShort } from '../engine/dates';
 import { NotFound } from './NotFound';
+import { Confirmation } from '../components/Confirmation';
 
 function Row({ item, read }: { item: LibraryItem; read: boolean }) {
   return (
@@ -44,6 +45,8 @@ export function LibraryDetail() {
   const { id = '' } = useParams();
   const item = LIBRARY_BY_ID[id];
   const { data, recordLibrary } = useStore();
+  const [justRead, setJustRead] = useState(false);
+  const [justTried, setJustTried] = useState(false);
   useEffect(() => {
     if (item) recordLibrary(item.id, 'opened');
     // record once per visit
@@ -73,17 +76,19 @@ export function LibraryDetail() {
         <h2 id="exr-h" className="eyebrow">Exercise</h2>
         <p className="font-semibold mt-1.5">{item.exercise.title}</p>
         <ol className="list-decimal pl-5 mt-2 space-y-1.5">{item.exercise.steps.map((s) => <li key={s}>{s}</li>)}</ol>
-        <button className={tried ? 'btn-secondary mt-4' : 'btn-primary mt-4'} onClick={() => recordLibrary(item.id, 'exercise')} disabled={tried}>
-          {tried ? <><Check size={17} aria-hidden="true" />Marked as tried</> : 'I tried this'}
-        </button>
+        {tried ? (
+          <Confirmation focus={justTried} className="flex items-center gap-2 font-medium text-accent mt-4"><Check size={17} aria-hidden="true" />Marked as tried</Confirmation>
+        ) : (
+          <button className="btn-primary mt-4" onClick={() => { recordLibrary(item.id, 'exercise'); setJustTried(true); }}>I tried this</button>
+        )}
       </section>
 
       <section className="card mt-5" aria-labelledby="read-h">
         <h2 id="read-h" className="eyebrow">Reading</h2>
         {completed ? (
-          <p className="flex items-center gap-2 font-medium text-accent mt-2"><Check size={17} aria-hidden="true" />Marked as read on {formatShort(completed.at)}. You can return to it any time.</p>
+          <Confirmation focus={justRead} className="flex items-center gap-2 font-medium text-accent mt-2"><Check size={17} aria-hidden="true" />Marked as read on {formatShort(completed.at)}. You can return to it any time.</Confirmation>
         ) : (
-          <button className="btn-secondary mt-3" onClick={() => recordLibrary(item.id, 'completed')}>Mark as read</button>
+          <button className="btn-secondary mt-3" onClick={() => { recordLibrary(item.id, 'completed'); setJustRead(true); }}>Mark as read</button>
         )}
         <p className="text-[13px] text-muted mt-2">This records that you read it. Reading is kept separate from practice and reflection in Progress.</p>
       </section>

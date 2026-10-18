@@ -19,9 +19,11 @@ export function ScenarioPlayer() {
   const [note, setNote] = useState('');
   const [completedNow, setCompletedNow] = useState(false);
   const feedbackRef = useRef<HTMLDivElement>(null);
+  const doneRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => { setSelected(null); setSeen([]); setNote(''); setCompletedNow(false); }, [id]);
   useEffect(() => { if (selected) feedbackRef.current?.focus(); }, [selected]);
+  useEffect(() => { if (completedNow) doneRef.current?.focus(); }, [completedNow]);
 
   if (!scenario) return <NotFound />;
 
@@ -106,7 +108,7 @@ export function ScenarioPlayer() {
 
       {completedNow && (
         <section className="mt-4 card border-accent/40" aria-live="polite" aria-labelledby="done-h">
-          <h2 id="done-h" className="flex items-center gap-2 font-semibold text-accent"><Check size={18} aria-hidden="true" />Scenario completed</h2>
+          <h2 id="done-h" ref={doneRef} tabIndex={-1} className="flex items-center gap-2 font-semibold text-accent outline-none"><Check size={18} aria-hidden="true" />Scenario completed</h2>
           <p className="text-[15px] text-muted mt-1">Saved to your history{note.trim() ? ', with your note' : ''}.</p>
           <div className="mt-4 flex flex-col sm:flex-row gap-3">
             {isFirst ? (

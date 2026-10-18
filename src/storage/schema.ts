@@ -24,6 +24,9 @@ type Json = Record<string, unknown>;
 type Migration = (input: Json) => Json;
 
 const arr = (v: unknown): Json[] => (Array.isArray(v) ? (v as Json[]) : []);
+/** Records that are not objects are passed through untouched, so salvage() counts and sets them aside with the raw copy kept. */
+const objs = (v: unknown): Json[] => arr(v).filter((x) => typeof x === 'object' && x !== null && !Array.isArray(x));
+const passThrough = (v: unknown): unknown[] => arr(v).filter((x) => !(typeof x === 'object' && x !== null && !Array.isArray(x)));
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 
 /** v1 domain ids (shipped in 1.0) mapped to the specified domain names. */
@@ -39,12 +42,6 @@ export const V1_LIBRARY_MAP: Record<string, string> = {
   'essay-boundary-not-wall': 'essay-boundaries',
   'essay-difficult-days': 'essay-difficult-day',
 };
-const V1_OUTCOME_LABEL: Record<string, string> = {
-  'in-the-moment': 'The intention came to mind in the moment.',
-  afterwards: 'I noticed afterwards.',
-  'slipped-past': 'It slipped past today.',
-};
-
 /**
  * Migrations keyed by the version they upgrade FROM. Each returns data at version + 1.
  * Version 0 means "no schemaVersion field".
@@ -65,59 +62,68 @@ export const MIGRATIONS: Record<number, Migration> = {
     };
   },
   1: (d) => {
+    // Equanim 1.0 → 1.1. Pure and deterministic: running it twice on the same input gives the same output.
+    // Malformed records are passed through as they are and dealt with by salvage(), never silently rewritten here.
     const mapDomain = (v: unknown): DomainId | null => (typeof v === 'string' && V1_DOMAIN_MAP[v]) || null;
-    const intentions = arr(d.intentions);
+    const intentions = objs(d.intentions);
     const reflections = intentions
       .filter((i) => i.reflection && typeof i.reflection === 'object')
       .map((i) => {
         const r = i.reflection as Json;
-        const label = V1_OUTCOME_LABEL[str(r.outcome)] ?? '';
         return {
           id: `ref_${str(i.id)}`,
-          date: str(i.date),
-          happened: [label, str(r.note)].filter(Boolean).join(' '),
-          initial: '', did: '', alternative: '', nextTime: '',
-          createdAt: str(r.at), updatedAt: str(r.at),
+          date: i.date,
+          happened: '', initial: '', did: '', alternative: '', nextTime: '',
+          createdAt: r.at, updatedAt: r.at,
+          legacyCheckIn: { outcome: r.outcome, note: r.note ?? '' },
         };
       });
-    const attempts = arr(d.attempts);
+    const attempts = objs(d.attempts);
     // 1.0 had no explicit completion step; exploring a scenario counted as doing it. Preserve that as one completion per scenario.
-    const byScenario = new Map<string, { at: string; options: Set<string> }>();
+    const byScenario = new Map<string, { at: string; options: string[] }>();
     for (const a of attempts) {
-      const cur = byScenario.get(str(a.scenarioId)) ?? { at: str(a.at), options: new Set<string>() };
-      if (str(a.at) > cur.at) cur.at = str(a.at);
-      cur.options.add(str(a.optionId));
-      byScenario.set(str(a.scenarioId), cur);
+      if (typeof a.scenarioId !== 'string' || typeof a.at !== 'string') continue;
+      const cur = byScenario.get(a.scenarioId) ?? { at: a.at, options: [] };
+      if (a.at > cur.at) cur.at = a.at;
+      if (typeof a.optionId === 'string' && !cur.options.includes(a.optionId)) cur.options.push(a.optionId);
+      byScenario.set(a.scenarioId, cur);
     }
+    const library: Json[] = [];
+    for (const r of objs(d.library)) {
+      const itemId = V1_LIBRARY_MAP[str(r.itemId)] ?? r.itemId;
+      if (r.kind === 'read') {
+        // 1.0 recorded "read" on opening and showed the item as Read. Keep both meanings: opened, and shown as read.
+        library.push({ itemId, kind: 'opened', at: r.at }, { itemId, kind: 'completed', at: r.at });
+      } else library.push({ itemId, kind: r.kind, at: r.at });
+    }
+    library.push(...(passThrough(d.library) as Json[]));
     return {
       schemaVersion: 2,
       createdAt: d.createdAt,
       onboardingCompletedAt: d.onboardingCompletedAt ?? null,
       settings: d.settings,
-      intentions: intentions.map((i) => ({
+      intentions: [...intentions.map((i) => ({
         id: i.id, date: i.date, category: 'custom', domain: mapDomain(i.domain), text: i.text, createdAt: i.createdAt, updatedAt: i.updatedAt,
-      })),
+      })), ...passThrough(d.intentions)],
       reflections,
       practices: [],
-      attempts,
-      completions: [...byScenario.entries()].map(([scenarioId, v]) => ({ id: `cmp_${scenarioId}_migrated`, scenarioId, at: v.at, optionIds: [...v.options], note: '' })),
-      journal: arr(d.journal).map((j) => ({
+      attempts: [...attempts, ...passThrough(d.attempts)],
+      completions: [...byScenario.entries()].map(([scenarioId, v]) => ({ id: `cmp_${scenarioId}_migrated`, scenarioId, at: v.at, optionIds: v.options, note: '' })),
+      journal: [...passThrough(d.journal), ...objs(d.journal).map((j) => ({
         id: j.id,
         type: 'incident',
+        // Same-meaning fields map to the incident questions; the two without an exact equivalent keep their 1.0 key and label.
         answers: Object.fromEntries(
-          Object.entries({ facts: str(j.situation), interpretation: str(j.story), response: str(j.response), better: str(j.nextTime), note: str(j.note) }).filter(([, v]) => v),
+          Object.entries({ facts: j.situation, interpretation: j.story, response: j.response, nextTime: j.nextTime, note: j.note })
+            .filter(([, v]) => typeof v !== 'string' || v.length > 0),
         ),
         domain: mapDomain(j.domain),
         scenarioId: j.scenarioId ?? null,
         themes: [],
         createdAt: j.createdAt,
         updatedAt: j.updatedAt,
-      })),
-      library: arr(d.library).map((r) => ({
-        itemId: V1_LIBRARY_MAP[str(r.itemId)] ?? r.itemId,
-        kind: r.kind === 'exercise' ? 'exercise' : 'opened', // 1.0 recorded "read" automatically on open, so it is not treated as a completion
-        at: r.at,
-      })),
+      }))],
+      library,
       inProgress: null,
     };
   },
@@ -152,6 +158,34 @@ const isDomain = (v: unknown): v is DomainId => typeof v === 'string' && (DOMAIN
 const isId = (v: unknown): v is string => typeof v === 'string' && v.length > 0 && v.length <= 120;
 const CATEGORIES = ['speak-carefully', 'separate-observation', 'ask-before-assuming', 'pause-before-responding', 'sincere-effort', 'custom'];
 
+const isLegacyCheckIn = (v: unknown) =>
+  v === undefined || (isObj(v) && ['in-the-moment', 'afterwards', 'slipped-past'].includes(String(v.outcome)) && isStr(v.note));
+
+const RECORD_CHECKS: Record<string, (x: Json) => boolean> = {
+  intentions: (x) =>
+    isId(x.id) && isDateKey(x.date) && CATEGORIES.includes(String(x.category)) && (x.domain === null || isDomain(x.domain)) &&
+    isStr(x.text, 500) && isIso(x.createdAt) && isIso(x.updatedAt),
+  reflections: (x) =>
+    isId(x.id) && isDateKey(x.date) && isStr(x.happened) && isStr(x.initial) && isStr(x.did) && isStr(x.alternative) && isStr(x.nextTime) &&
+    isIso(x.createdAt) && isIso(x.updatedAt) && isLegacyCheckIn(x.legacyCheckIn),
+  practices: (x) => isId(x.id) && isId(x.practiceId) && isDateKey(x.date) && isStr(x.response) && isIso(x.completedAt),
+  attempts: (x) => isId(x.id) && isId(x.scenarioId) && isId(x.optionId) && isIso(x.at),
+  completions: (x) =>
+    isId(x.id) && isId(x.scenarioId) && isIso(x.at) && Array.isArray(x.optionIds) && x.optionIds.every((o) => isId(o)) && isStr(x.note),
+  journal: (x) =>
+    isId(x.id) && ['incident', 'daily', 'free'].includes(String(x.type)) && isObj(x.answers) &&
+    Object.entries(x.answers).every(([k, v]) => k.length <= 40 && isStr(v)) &&
+    (x.domain === null || isDomain(x.domain)) && (x.scenarioId === null || isId(x.scenarioId)) &&
+    Array.isArray(x.themes) && x.themes.length <= 20 && x.themes.every((t) => isStr(t, 40)) &&
+    isIso(x.createdAt) && isIso(x.updatedAt),
+  library: (x) => isId(x.itemId) && ['opened', 'completed', 'exercise'].includes(String(x.kind)) && isIso(x.at),
+};
+const COLLECTIONS = Object.keys(RECORD_CHECKS);
+const isSettings = (s: unknown) =>
+  isObj(s) && isStr(s.displayName, 80) && typeof s.streaksEnabled === 'boolean' && ['system', 'light', 'dark'].includes(String(s.theme));
+const isInProgress = (ip: unknown) =>
+  ip === null || (isObj(ip) && (ip.kind === 'scenario' || ip.kind === 'practice') && isId(ip.refId) && isIso(ip.startedAt) && isStr(ip.draft));
+
 export function validateAppData(d: unknown): { ok: true; data: AppData } | { ok: false; errors: string[] } {
   const errors: string[] = [];
   const fail = (m: string) => errors.push(m);
@@ -159,39 +193,47 @@ export function validateAppData(d: unknown): { ok: true; data: AppData } | { ok:
   if (d.schemaVersion !== SCHEMA_VERSION) fail('Unsupported schema version.');
   if (!isIso(d.createdAt)) fail('createdAt is missing or invalid.');
   if (!(d.onboardingCompletedAt === null || isIso(d.onboardingCompletedAt))) fail('onboardingCompletedAt is invalid.');
-  const s = d.settings;
-  if (!isObj(s) || !isStr(s.displayName, 80) || typeof s.streaksEnabled !== 'boolean' || !['system', 'light', 'dark'].includes(String(s.theme)))
-    fail('settings are invalid.');
-
-  const list = (key: string, check: (x: Json) => boolean) => {
+  if (!isSettings(d.settings)) fail('settings are invalid.');
+  for (const key of COLLECTIONS) {
     const v = d[key];
-    if (!Array.isArray(v)) return fail(`${key} must be a list.`);
-    v.forEach((x, i) => {
-      if (!isObj(x) || !check(x)) fail(`${key}[${i}] is invalid.`);
-    });
-  };
-
-  list('intentions', (x) =>
-    isId(x.id) && isDateKey(x.date) && CATEGORIES.includes(String(x.category)) && (x.domain === null || isDomain(x.domain)) &&
-    isStr(x.text, 500) && isIso(x.createdAt) && isIso(x.updatedAt));
-  list('reflections', (x) =>
-    isId(x.id) && isDateKey(x.date) && isStr(x.happened) && isStr(x.initial) && isStr(x.did) && isStr(x.alternative) && isStr(x.nextTime) &&
-    isIso(x.createdAt) && isIso(x.updatedAt));
-  list('practices', (x) => isId(x.id) && isId(x.practiceId) && isDateKey(x.date) && isStr(x.response) && isIso(x.completedAt));
-  list('attempts', (x) => isId(x.id) && isId(x.scenarioId) && isId(x.optionId) && isIso(x.at));
-  list('completions', (x) =>
-    isId(x.id) && isId(x.scenarioId) && isIso(x.at) && Array.isArray(x.optionIds) && x.optionIds.every((o) => isId(o)) && isStr(x.note));
-  list('journal', (x) =>
-    isId(x.id) && ['incident', 'daily', 'free'].includes(String(x.type)) && isObj(x.answers) &&
-    Object.entries(x.answers).every(([k, v]) => k.length <= 40 && isStr(v)) &&
-    (x.domain === null || isDomain(x.domain)) && (x.scenarioId === null || isId(x.scenarioId)) &&
-    Array.isArray(x.themes) && x.themes.length <= 20 && x.themes.every((t) => isStr(t, 40)) &&
-    isIso(x.createdAt) && isIso(x.updatedAt));
-  list('library', (x) => isId(x.itemId) && ['opened', 'completed', 'exercise'].includes(String(x.kind)) && isIso(x.at));
-  const ip = d.inProgress;
-  if (!(ip === null || (isObj(ip) && (ip.kind === 'scenario' || ip.kind === 'practice') && isId(ip.refId) && isIso(ip.startedAt) && isStr(ip.draft))))
-    fail('inProgress is invalid.');
-
+    if (!Array.isArray(v)) { fail(`${key} must be a list.`); continue; }
+    v.forEach((x, i) => { if (!isObj(x) || !RECORD_CHECKS[key]!(x)) fail(`${key}[${i}] is invalid.`); });
+  }
+  if (!isInProgress(d.inProgress)) fail('inProgress is invalid.');
   if (errors.length) return { ok: false, errors };
   return { ok: true, data: d as unknown as AppData };
+}
+
+/**
+ * Recovery for stored data with some malformed values: keeps every record that is valid, replaces invalid
+ * top-level values with safe defaults, and counts what was set aside. The caller must keep the original raw
+ * text before using the result, so nothing set aside is lost. Import does NOT use this: imports are all-or-nothing.
+ */
+export function salvage(d: Json): { data: AppData; dropped: number } | null {
+  if (d.schemaVersion !== SCHEMA_VERSION) return null;
+  const base = emptyData();
+  let dropped = 0;
+  const out: Json = { ...base };
+  out.createdAt = isIso(d.createdAt) ? d.createdAt : base.createdAt;
+  out.onboardingCompletedAt = d.onboardingCompletedAt === null || isIso(d.onboardingCompletedAt) ? d.onboardingCompletedAt ?? null : base.createdAt;
+  if (isSettings(d.settings)) out.settings = d.settings;
+  else {
+    const s = isObj(d.settings) ? d.settings : {};
+    out.settings = {
+      displayName: isStr(s.displayName, 80) ? s.displayName : '',
+      streaksEnabled: typeof s.streaksEnabled === 'boolean' ? s.streaksEnabled : false,
+      theme: ['system', 'light', 'dark'].includes(String(s.theme)) ? s.theme : 'system',
+    };
+    dropped++;
+  }
+  for (const key of COLLECTIONS) {
+    const v = Array.isArray(d[key]) ? (d[key] as unknown[]) : [];
+    if (!Array.isArray(d[key]) && d[key] !== undefined) dropped++;
+    const kept = v.filter((x) => isObj(x) && RECORD_CHECKS[key]!(x));
+    dropped += v.length - kept.length;
+    out[key] = kept;
+  }
+  out.inProgress = isInProgress(d.inProgress) ? d.inProgress ?? null : null;
+  const v = validateAppData(out);
+  return v.ok ? { data: v.data, dropped } : null;
 }

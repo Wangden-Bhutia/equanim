@@ -9,7 +9,8 @@ import { orientationFor } from '../data/orientation';
 import { dateKey, dayIndex, formatLongDate } from '../engine/dates';
 import { computeStreak, activityDays, practiceForDay, suggestScenarioId } from '../engine/progress';
 import type { IntentionCategory } from '../types';
-import { DomainTag } from '../components/ui';
+import { DomainTag, LegacyCheckIn } from '../components/ui';
+import { Confirmation } from '../components/Confirmation';
 
 export const REFLECTION_QUESTIONS: { key: keyof ReflectionDraft; label: string }[] = [
   { key: 'happened', label: 'What happened?' },
@@ -35,6 +36,7 @@ function Intention() {
   const [editing, setEditing] = useState(!intention);
   const [category, setCategory] = useState<IntentionCategory>(intention?.category ?? 'separate-observation');
   const [text, setText] = useState(intention?.text ?? INTENTION_OPTIONS[1]?.example ?? '');
+  const [justSaved, setJustSaved] = useState(false);
 
   const pick = (c: IntentionCategory) => {
     setCategory(c);
@@ -45,6 +47,7 @@ function Intention() {
     if (!text.trim()) return;
     setIntention(category, text, INTENTION_OPTIONS.find((o) => o.id === category)?.domain ?? null);
     setEditing(false);
+    setJustSaved(true);
   };
   const label = category === 'custom' ? 'Custom intention' : INTENTION_OPTIONS.find((o) => o.id === category)?.label;
 
@@ -53,9 +56,9 @@ function Intention() {
       <SectionTitle id="int-h" icon={<Sunrise size={18} className="text-terracotta" aria-hidden="true" />}>Morning intention</SectionTitle>
       {intention && !editing ? (
         <div>
-          <p className="text-[13px] text-muted">{intention.category === 'custom' ? 'Custom intention' : INTENTION_OPTIONS.find((o) => o.id === intention.category)?.label}</p>
+          <Confirmation focus={justSaved} className="text-[13px] text-muted">{justSaved && <span className="sr-only">Intention saved. </span>}{intention.category === 'custom' ? 'Custom intention' : INTENTION_OPTIONS.find((o) => o.id === intention.category)?.label}</Confirmation>
           <p className="font-serif text-[20px] leading-snug mt-1">{intention.text}</p>
-          <button className="btn-ghost !px-0 mt-2 text-sm" onClick={() => { setCategory(intention.category); setText(intention.text); setEditing(true); }}>
+          <button className="btn-ghost !px-0 mt-2 text-sm" onClick={() => { setCategory(intention.category); setText(intention.text); setEditing(true); setJustSaved(false); }}>
             <Pencil size={15} aria-hidden="true" />Change intention
           </button>
         </div>
@@ -94,6 +97,7 @@ function DailyPracticeCard({ practiceId }: { practiceId: string }) {
   const draftSaved = data.inProgress?.kind === 'practice' && data.inProgress.refId === practice?.id ? data.inProgress.draft : '';
   const [open, setOpen] = useState(!!draftSaved);
   const [response, setResponse] = useState(draftSaved);
+  const [justDone, setJustDone] = useState(false);
   if (!practice) return null;
 
   return (
@@ -103,7 +107,7 @@ function DailyPracticeCard({ practiceId }: { practiceId: string }) {
       <h3 className="font-serif text-[20px] font-semibold mt-1">{practice.title}</h3>
       {doneToday ? (
         <div className="mt-2">
-          <p className="flex items-center gap-2 font-medium text-accent"><Check size={18} aria-hidden="true" />Completed today</p>
+          <Confirmation focus={justDone} className="flex items-center gap-2 font-medium text-accent"><Check size={18} aria-hidden="true" />Completed today</Confirmation>
           {doneToday.response && <p className="text-muted mt-2 whitespace-pre-wrap break-words">{doneToday.response}</p>}
         </div>
       ) : !open ? (
@@ -119,7 +123,7 @@ function DailyPracticeCard({ practiceId }: { practiceId: string }) {
           <textarea id="pr-resp" className="field min-h-[96px]" value={response}
             onChange={(e) => { setResponse(e.target.value); setPracticeDraft(practice.id, e.target.value); }} />
           <p className="text-[13px] text-muted mt-1.5">Your response is saved as you type, so you can come back to it later.</p>
-          <button className="btn-primary mt-4" onClick={() => completePractice(practice.id, response)}>Mark practice complete</button>
+          <button className="btn-primary mt-4" onClick={() => { completePractice(practice.id, response); setJustDone(true); }}>Mark practice complete</button>
         </div>
       )}
     </section>
@@ -131,6 +135,7 @@ function EveningReflection() {
   const today = dateKey();
   const existing = data.reflections.find((r) => r.date === today);
   const [editing, setEditing] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
   const empty: ReflectionDraft = { happened: '', initial: '', did: '', alternative: '', nextTime: '' };
   const [draft, setDraft] = useState<ReflectionDraft>(existing ? { happened: existing.happened, initial: existing.initial, did: existing.did, alternative: existing.alternative, nextTime: existing.nextTime } : empty);
   const hasAny = REFLECTION_QUESTIONS.some((q) => draft[q.key].trim());
@@ -140,12 +145,13 @@ function EveningReflection() {
       <SectionTitle id="ref-h" icon={<Moon size={18} className="text-accent" aria-hidden="true" />}>Evening reflection</SectionTitle>
       {existing && !editing ? (
         <div>
-          <p className="flex items-center gap-2 font-medium text-accent"><Check size={18} aria-hidden="true" />Reflection saved for today</p>
+          <Confirmation focus={justSaved} className="flex items-center gap-2 font-medium text-accent"><Check size={18} aria-hidden="true" />Reflection saved for today</Confirmation>
           <dl className="mt-3 space-y-2 text-[15px]">
             {REFLECTION_QUESTIONS.filter((q) => existing[q.key]).map((q) => (
               <div key={q.key}><dt className="text-muted text-[13px]">{q.label}</dt><dd className="whitespace-pre-wrap break-words">{existing[q.key]}</dd></div>
             ))}
           </dl>
+          {existing.legacyCheckIn && <div className="mt-2"><LegacyCheckIn value={existing.legacyCheckIn} /></div>}
           <button className="btn-ghost !px-0 mt-2 text-sm" onClick={() => setEditing(true)}><Pencil size={15} aria-hidden="true" />Edit reflection</button>
         </div>
       ) : !editing ? (
@@ -154,7 +160,7 @@ function EveningReflection() {
           <button className="btn-secondary mt-3" onClick={() => setEditing(true)}>Reflect on today</button>
         </div>
       ) : (
-        <form onSubmit={(e) => { e.preventDefault(); if (hasAny) { saveReflection(draft); setEditing(false); } }} className="space-y-4">
+        <form onSubmit={(e) => { e.preventDefault(); if (hasAny) { saveReflection(draft); setEditing(false); setJustSaved(true); } }} className="space-y-4">
           {REFLECTION_QUESTIONS.map((q) => (
             <div key={q.key}>
               <label htmlFor={`ref-${q.key}`} className="label">{q.label}</label>

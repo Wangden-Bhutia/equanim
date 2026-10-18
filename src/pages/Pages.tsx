@@ -3,6 +3,7 @@ import { ChevronRight } from 'lucide-react';
 import { DOMAIN_LIST } from '../data/domains';
 import { SECONDARY_NAV } from '../components/nav';
 import { PageHeader } from '../components/ui';
+import { InstallApp } from '../components/InstallApp';
 
 export function More() {
   return (
@@ -19,6 +20,7 @@ export function More() {
           </li>
         ))}
       </ul>
+      <section className="mt-6" aria-label="Install App"><InstallApp variant="row" /></section>
       <p className="text-center text-xs text-muted mt-8">Equanim 1.1 · Clarity in the midst of life.</p>
     </div>
   );

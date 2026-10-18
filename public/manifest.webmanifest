@@ -2,19 +2,19 @@
   "id": "/equanim/",
   "name": "Equanim",
   "short_name": "Equanim",
-  "description": "Clarity in the midst of life.",
+  "description": "Clarity in the midst of life. A daily practice companion.",
+  "lang": "en",
+  "dir": "ltr",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#F6F3EB",
   "theme_color": "#F6F3EB",
+  "categories": [
+    "education",
+    "lifestyle"
+  ],
   "icons": [
-    {
-      "src": "icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any"
-    },
     {
       "src": "icon-192.png",
       "sizes": "192x192",
@@ -25,6 +25,18 @@
       "src": "icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
       "purpose": "any"
     }
   ]

@@ -40,7 +40,8 @@ export const JOURNAL_TYPES: Record<JournalType, JournalTypeDef> = {
 export const JOURNAL_TYPE_LIST = [JOURNAL_TYPES.incident, JOURNAL_TYPES.daily, JOURNAL_TYPES.free];
 
 /** Labels for answer keys carried over from Equanim 1.0 entries. */
-export const LEGACY_LABELS: Record<string, string> = { note: 'Additional note' };
+/** Equanim 1.0 journal fields without an exact equivalent keep their original key and label, so their meaning does not change. */
+export const LEGACY_LABELS: Record<string, string> = { nextTime: 'What I might try next time', note: 'Anything else' };
 
 export function labelFor(type: JournalType, key: string): string {
   return JOURNAL_TYPES[type].questions.find((q) => q.key === key)?.label ?? LEGACY_LABELS[key] ?? key;

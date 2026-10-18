@@ -6,6 +6,7 @@ import { exportFileName, exportJson, parseImport, summarize, type DataSummary } 
 import { formatShort } from '../engine/dates';
 import type { AppData, ThemePreference } from '../types';
 import { ConfirmDialog, PageHeader } from '../components/ui';
+import { InstallApp } from '../components/InstallApp';
 
 function readFileText(file: File): Promise<string> {
   if (typeof file.text === 'function') return file.text();
@@ -26,6 +27,45 @@ function SummaryList({ s }: { s: DataSummary }) {
       <li>{s.journal} journal entries</li>
       <li>{s.library} reading records</li>
     </ul>
+  );
+}
+
+const COPY_LABEL = { unreadable: 'Unreadable data', 'pre-migration': 'Original before upgrade', recovered: 'Original before recovery' } as const;
+
+function download(name: string, text: string) {
+  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/** Lists safety copies kept on this device so they can be saved as files. They are never deleted automatically. */
+function RecoveryCopies() {
+  const { safetyCopies, readSafetyCopy } = useStore();
+  const copies = safetyCopies();
+  if (copies.length === 0) return null;
+  return (
+    <section className="card" aria-labelledby="rec-h">
+      <h2 id="rec-h" className="eyebrow">Recovery copies</h2>
+      <p className="text-[15px] text-muted mt-1">Equanim keeps an exact copy of your saved data before upgrading it or recovering from damaged values. These copies stay on this device until you erase all data. An "original before upgrade" copy can be imported here like a backup.</p>
+      <ul className="mt-3 space-y-2">
+        {copies.map((c) => (
+          <li key={c.key} className="flex items-center justify-between gap-3 text-[15px]">
+            <span className="min-w-0">
+              <span className="block font-medium">{COPY_LABEL[c.kind]}</span>
+              <span className="block text-[13px] text-muted">{c.at ? formatShort(new Date(c.at).toISOString()) : 'Date unknown'} · {Math.max(1, Math.round(c.size / 1024))} KB</span>
+            </span>
+            <button className="btn-secondary !min-h-[44px] shrink-0" onClick={() => { const raw = readSafetyCopy(c.key); if (raw !== null) download(`equanim-${c.kind}-${c.at || 'copy'}.json`, raw); }}>
+              <Download size={16} aria-hidden="true" />Download<span className="sr-only"> {COPY_LABEL[c.kind].toLowerCase()}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -109,10 +149,18 @@ export function Settings() {
           </div>
           <button type="button" role="switch" aria-checked={data.settings.streaksEnabled} aria-labelledby="streak-l" aria-describedby="streak-d"
             onClick={() => updateSettings({ streaksEnabled: !data.settings.streaksEnabled })}
-            className={`relative shrink-0 w-12 h-7 rounded-full transition-colors mt-1 ${data.settings.streaksEnabled ? 'bg-accent' : 'bg-line'}`}>
-            <span className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white shadow transition-transform ${data.settings.streaksEnabled ? 'translate-x-5' : ''}`} />
+            className="shrink-0 min-h-[44px] min-w-[56px] flex items-center justify-center rounded-full">
+            <span aria-hidden="true" className={`relative block w-12 h-7 rounded-full transition-colors ${data.settings.streaksEnabled ? 'bg-accent' : 'bg-line'}`}>
+              <span className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white shadow transition-transform ${data.settings.streaksEnabled ? 'translate-x-5' : ''}`} />
+            </span>
           </button>
         </div>
+      </section>
+
+      <section className="card" aria-labelledby="inst-h">
+        <h2 id="inst-h" className="eyebrow">App</h2>
+        <p className="text-[15px] text-muted mt-1 mb-4">Install Equanim to open it from its own icon and use it offline. Installing changes nothing about where your data is kept.</p>
+        <InstallApp variant="card" />
       </section>
 
       <section className="card" aria-labelledby="data-h">
@@ -129,6 +177,8 @@ export function Settings() {
         </div>
         {importError && <p role="alert" className="text-danger text-sm mt-3">{importError}</p>}
       </section>
+
+      <RecoveryCopies />
 
       <section className="card border-danger/30" aria-labelledby="reset-h">
         <h2 id="reset-h" className="eyebrow !text-danger">Erase everything</h2>

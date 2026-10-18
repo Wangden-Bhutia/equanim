@@ -3,7 +3,7 @@ import { useStore } from '../app/store';
 import { DOMAIN_LIST } from '../data/domains';
 import { computeProgress } from '../engine/progress';
 import { formatShort } from '../engine/dates';
-import { EmptyState, PageHeader } from '../components/ui';
+import { EmptyState, LegacyCheckIn, PageHeader } from '../components/ui';
 
 function Stat({ value, label, hint }: { value: number | string; label: string; hint?: string }) {
   return (
@@ -105,7 +105,8 @@ export function Progress() {
             {p.recentReflections.map((r) => (
               <li key={r.id} className="text-[15px]">
                 <p className="text-[13px] text-muted">{formatShort(`${r.date}T12:00:00`)}</p>
-                <p className="break-words">{r.happened || r.did || r.initial || r.alternative || r.nextTime}</p>
+                {(r.happened || r.did || r.initial || r.alternative || r.nextTime) && <p className="break-words">{r.happened || r.did || r.initial || r.alternative || r.nextTime}</p>}
+                {r.legacyCheckIn && <LegacyCheckIn value={r.legacyCheckIn} />}
                 {r.nextTime && <p className="text-[13.5px] text-muted mt-0.5">Next time: {r.nextTime}</p>}
               </li>
             ))}

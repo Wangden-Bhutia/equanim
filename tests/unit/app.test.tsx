@@ -290,3 +290,67 @@ describe('settings and data', () => {
     expect(Object.keys(localStorage).some((k) => k.startsWith('equanim:unreadable:'))).toBe(true);
   });
 });
+
+describe('accessibility behaviour', () => {
+  it('moves focus to the confirmation after completing a practice, so keyboard users keep their place', async () => {
+    onboarded();
+    const u = userEvent.setup();
+    render(<App />);
+    await u.click(await screen.findByRole('button', { name: 'Begin practice' }));
+    await u.click(screen.getByRole('button', { name: 'Mark practice complete' }));
+    expect(screen.getByText('Completed today').closest('p')).toHaveFocus();
+  });
+  it('keeps Tab inside dialogs, closes on Escape and returns focus', async () => {
+    onboarded();
+    const u = userEvent.setup();
+    render(<App />);
+    go('#/settings');
+    const opener = await screen.findByRole('button', { name: 'Erase all data' });
+    await u.click(opener);
+    const dlg = screen.getByRole('dialog', { name: 'Erase all data?' });
+    expect(within(dlg).getByLabelText(/type erase/i)).toHaveFocus();
+    for (let i = 0; i < 5; i++) {
+      await u.tab();
+      expect(dlg.contains(document.activeElement)).toBe(true);
+    }
+    await u.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(opener).toHaveFocus();
+  });
+  it('marks the current page in navigation', async () => {
+    onboarded();
+    render(<App />);
+    go('#/journal');
+    await screen.findByRole('heading', { level: 1, name: 'Journal' });
+    for (const nav of screen.getAllByRole('navigation', { name: 'Primary' })) {
+      expect(within(nav).getByRole('link', { name: 'Journal' })).toHaveAttribute('aria-current', 'page');
+    }
+  });
+});
+
+describe('Equanim 1.0 data in the app', () => {
+  it('opens migrated records with their original wording', async () => {
+    const t = new Date().toISOString();
+    const day = dateKeyLocal();
+    localStorage.setItem(DATA_KEY, JSON.stringify({
+      schemaVersion: 1, createdAt: t, onboardingCompletedAt: t, settings: { displayName: 'Asha', streaksEnabled: false, theme: 'light' },
+      intentions: [{ id: 'i1', date: day, domain: 'words', text: 'Old intention', createdAt: t, updatedAt: t, reflection: { outcome: 'afterwards', note: 'Saw it later.', at: t } }],
+      attempts: [], library: [],
+      journal: [{ id: 'j1', createdAt: t, updatedAt: t, domain: null, scenarioId: null, situation: 'Old entry', story: '', response: '', nextTime: 'Pause first', note: '' }],
+    }));
+    render(<App />);
+    expect(await screen.findByText('Old intention')).toBeInTheDocument();
+    expect(screen.getByText('I noticed afterwards')).toBeInTheDocument();
+    expect(screen.getByText('Saw it later.')).toBeInTheDocument();
+    go('#/journal/j1');
+    expect(await screen.findByText('What I might try next time')).toBeInTheDocument();
+    expect(screen.getByText('Pause first')).toBeInTheDocument();
+    go('#/settings');
+    expect(await screen.findByText('Original before upgrade')).toBeInTheDocument();
+  });
+});
+
+function dateKeyLocal() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}

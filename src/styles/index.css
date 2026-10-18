@@ -97,3 +97,8 @@ h2, h3 { @apply text-ink; }
 
 .no-scrollbar { scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* Visually hidden radios inside card-style labels: show the focus ring on the card itself. */
+label:has(> input.sr-only:focus-visible) { outline: 2px solid rgb(var(--accent)); outline-offset: 2px; }
+/* Text fields keep a clear focus indicator in addition to the border colour change. */
+.field:focus-visible { box-shadow: 0 0 0 3px rgb(var(--accent) / 0.35); }

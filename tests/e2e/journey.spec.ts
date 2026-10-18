@@ -22,7 +22,7 @@ async function axe(page: Page) {
 
 const primary = (page: Page) => page.getByRole('navigation', { name: 'Primary' }).locator('visible=true');
 
-test('onboarding sample journey, a full day of practice, and every screen in light and dark', async ({ page }) => {
+test('[SIMULATED phone: Pixel 7 profile in Chromium, not a real device] onboarding sample journey, a full day of practice, every screen in light and dark', async ({ page, context }) => {
   await page.goto('./');
   await page.evaluate(() => localStorage.clear());
   await page.goto('./');
@@ -116,6 +116,11 @@ test('onboarding sample journey, a full day of practice, and every screen in lig
   await page.getByRole('button', { name: 'Save entry' }).click();
   await expect(page.getByText('That she was unhappy with my work.')).toBeVisible();
   await shot(page, '20-journal-entry');
+  // Edit the entry
+  await page.getByRole('link', { name: 'Edit' }).click();
+  await page.getByLabel('What, if anything, should I do next?').fill('Ask how she prefers updates.');
+  await page.getByRole('button', { name: 'Save entry' }).click();
+  await expect(page.getByText('Ask how she prefers updates.')).toBeVisible();
   await page.goto('./#/journal/new?type=daily');
   await page.getByLabel('Where did I respond deliberately today?').fill('In the standup.');
   await page.getByRole('button', { name: 'Save entry' }).click();
@@ -142,6 +147,15 @@ test('onboarding sample journey, a full day of practice, and every screen in lig
   await expect(page.getByText('readings completed')).toBeVisible();
   await axe(page);
   await shot(page, '24-progress', true);
+
+  // Close the app and open it again: everything is still there.
+  const url = page.url().split('#')[0];
+  await page.close();
+  page = await context.newPage();
+  await page.goto(`${url}#/journal`);
+  await expect(page.getByText('A quieter day.')).toBeVisible();
+  await page.goto(`${url}#/`);
+  await expect(page.getByText('Said yes to a meeting')).toBeVisible();
 
   // Secondary pages with their specified names
   const secondary = [

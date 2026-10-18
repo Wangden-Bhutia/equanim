@@ -6,25 +6,24 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Least privilege: the build job (which also runs for pull requests) can only read the repository.
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    concurrency:
+      group: ci-${{ github.ref }}
+      cancel-in-progress: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-      - run: npm ci
+      - name: Install (exact versions from package-lock.json)
+        run: npm ci
       - name: Typecheck
         run: npm run typecheck
       - name: Lint
@@ -33,19 +32,40 @@ jobs:
         run: npm test
       - name: Production build
         run: npm run build
-      - name: End-to-end journey (390x844)
+      - name: Check build artifact
+        run: |
+          for f in index.html sw.js manifest.webmanifest icon-192.png icon-512.png icon-maskable-512.png theme-init.js .nojekyll; do
+            test -f "dist/$f" || { echo "missing dist/$f"; exit 1; }
+          done
+          grep -q '/equanim/assets/' dist/index.html || { echo "assets not under /equanim/"; exit 1; }
+          if grep -rIl --exclude-dir=assets -E '(ghp_|github_pat_|AKIA[0-9A-Z]{16}|BEGIN (RSA|EC|OPENSSH) PRIVATE KEY)' dist; then echo "possible secret in dist"; exit 1; fi
+      - name: Browser tests (Playwright, emulated phone and desktop)
         run: |
           npx playwright install --with-deps chromium
           npx playwright test
+      - name: Keep Playwright output on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: test-results
+          retention-days: 7
       - uses: actions/upload-pages-artifact@v3
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         with:
           path: dist
 
   deploy:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    # Never cancel a deployment that is already running.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

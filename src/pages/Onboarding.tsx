@@ -84,9 +84,11 @@ export function Onboarding() {
     completeOnboarding(name);
   };
   const skip = () => finish('/');
-  const notice = loadIssue ? (
+  const notice = loadIssue && loadIssue.kind !== 'partial' ? (
     <p role="alert" className="card !p-4 mb-6 bg-claysoft border-terracotta/50 text-sm">
-      Your previously saved data could not be opened, so Equanim is starting fresh. The unreadable copy was kept on this device, not deleted. If you have an exported backup, you can import it from Settings and Data after this introduction.
+      {loadIssue.kind === 'backup-failed'
+        ? 'Equanim could not make a safety copy of your saved data (storage may be full), so saving is paused to protect what is already stored. Free some browser storage, then reload.'
+        : 'Your previously saved data could not be opened, so Equanim is starting fresh. The unreadable copy was kept on this device, not deleted, and can be downloaded from Settings and Data. If you have an exported backup, you can import it there after this introduction.'}
     </p>
   ) : undefined;
 

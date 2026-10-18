@@ -38,7 +38,18 @@ export interface EveningReflection {
   nextTime: string;
   createdAt: string;
   updatedAt: string;
+  /** Equanim 1.0 intention check-in, preserved exactly as it was recorded. */
+  legacyCheckIn?: { outcome: LegacyOutcome; note: string };
 }
+
+export type LegacyOutcome = 'in-the-moment' | 'afterwards' | 'slipped-past';
+/** Labels Equanim 1.0 showed for each check-in outcome, and for its note field. */
+export const LEGACY_OUTCOME_LABELS: Record<LegacyOutcome, string> = {
+  'in-the-moment': 'It came to mind in the moment',
+  afterwards: 'I noticed afterwards',
+  'slipped-past': 'It slipped past today',
+};
+export const LEGACY_NOTE_LABEL = 'What did you observe, and what meaning did you add to it?';
 
 export interface PracticeCompletion {
   id: string;

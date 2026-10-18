@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Repository, LocalStorageAdapter, type LoadIssue, type StorageAdapter } from '../storage/storage';
+import { Repository, LocalStorageAdapter, DATA_KEY, type LoadIssue, type StorageAdapter } from '../storage/storage';
 import { emptyData } from '../storage/schema';
 import { mergeData } from '../storage/transfer';
 import { dateKey } from '../engine/dates';
@@ -31,6 +31,8 @@ interface StoreValue {
   restoreBackup: () => boolean;
   backupInfo: () => { savedAt: string } | null;
   resetAll: () => void;
+  safetyCopies: () => ReturnType<Repository['safetyCopies']>;
+  readSafetyCopy: (key: string) => string | null;
 }
 
 const StoreContext = createContext<StoreValue | null>(null);
@@ -50,6 +52,19 @@ export function StoreProvider({ children, adapter }: { children: ReactNode; adap
     }
     setSaveError(!repo.save(data));
   }, [data, repo]);
+
+  // Another tab wrote Equanim data: reload it instead of later overwriting it with this tab's older copy.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== DATA_KEY || e.storageArea !== window.localStorage) return;
+      const r = repo.load();
+      skipSave.current = true;
+      setData(r.data);
+      if (r.issue) setLoadIssue(r.issue);
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [repo]);
 
   useEffect(() => {
     const apply = () => {
@@ -149,6 +164,8 @@ export function StoreProvider({ children, adapter }: { children: ReactNode; adap
       setData(emptyData());
       setLoadIssue(null);
     },
+    safetyCopies: () => repo.safetyCopies(),
+    readSafetyCopy: (key) => repo.readRaw(key),
   };
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
