@@ -1,12 +1,13 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Repository, LocalStorageAdapter, type LoadIssue, type StorageAdapter } from '../lib/storage';
-import { emptyData } from '../lib/schema';
-import { mergeData } from '../lib/transfer';
-import { dateKey } from '../lib/dates';
-import { newId } from '../lib/id';
-import type { AppData, DomainId, JournalEntry, ReflectionOutcome, Settings } from '../lib/types';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Repository, LocalStorageAdapter, type LoadIssue, type StorageAdapter } from '../storage/storage';
+import { emptyData } from '../storage/schema';
+import { mergeData } from '../storage/transfer';
+import { dateKey } from '../engine/dates';
+import { newId } from '../engine/id';
+import type { AppData, DomainId, EveningReflection, IntentionCategory, JournalEntry, Settings } from '../types';
 
 export type JournalDraft = Omit<JournalEntry, 'id' | 'createdAt' | 'updatedAt'>;
+export type ReflectionDraft = Pick<EveningReflection, 'happened' | 'initial' | 'did' | 'alternative' | 'nextTime'>;
 
 interface StoreValue {
   data: AppData;
@@ -15,14 +16,17 @@ interface StoreValue {
   dismissLoadIssue: () => void;
   completeOnboarding: (displayName?: string) => void;
   updateSettings: (patch: Partial<Settings>) => void;
-  setIntention: (domain: DomainId, text: string) => void;
-  clearIntention: (date: string) => void;
-  reflectOnIntention: (date: string, outcome: ReflectionOutcome, note: string) => void;
+  setIntention: (category: IntentionCategory, text: string, domain: DomainId | null) => void;
+  saveReflection: (draft: ReflectionDraft) => void;
+  setPracticeDraft: (practiceId: string, draft: string) => void;
+  completePractice: (practiceId: string, response: string) => void;
   recordAttempt: (scenarioId: string, optionId: string) => void;
+  completeScenario: (scenarioId: string, optionIds: string[], note: string) => void;
+  clearInProgress: () => void;
   createJournal: (draft: JournalDraft) => string;
   updateJournal: (id: string, draft: JournalDraft) => void;
   deleteJournal: (id: string) => void;
-  recordLibrary: (itemId: string, kind: 'read' | 'exercise') => void;
+  recordLibrary: (itemId: string, kind: 'opened' | 'completed' | 'exercise') => void;
   importData: (incoming: AppData, mode: 'merge' | 'replace') => void;
   restoreBackup: () => boolean;
   backupInfo: () => { savedAt: string } | null;
@@ -37,11 +41,11 @@ export function StoreProvider({ children, adapter }: { children: ReactNode; adap
   const [data, setData] = useState<AppData>(initial.data);
   const [loadIssue, setLoadIssue] = useState<LoadIssue | null>(initial.issue);
   const [saveError, setSaveError] = useState(false);
-  const first = useRef(true);
+  const skipSave = useRef(true);
 
   useEffect(() => {
-    if (first.current) {
-      first.current = false;
+    if (skipSave.current) {
+      skipSave.current = false;
       return;
     }
     setSaveError(!repo.save(data));
@@ -52,6 +56,7 @@ export function StoreProvider({ children, adapter }: { children: ReactNode; adap
       const t = data.settings.theme;
       const dark = t === 'dark' || (t === 'system' && window.matchMedia?.('(prefers-color-scheme: dark)').matches);
       document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#1E2320' : '#F6F3EB');
     };
     apply();
     const mq = window.matchMedia?.('(prefers-color-scheme: dark)');
@@ -60,7 +65,7 @@ export function StoreProvider({ children, adapter }: { children: ReactNode; adap
   }, [data.settings.theme]);
 
   const now = () => new Date().toISOString();
-  const update = useCallback((fn: (d: AppData) => AppData) => setData((d) => fn(d)), []);
+  const update = (fn: (d: AppData) => AppData) => setData((d) => fn(d));
 
   const value: StoreValue = {
     data,
@@ -74,37 +79,56 @@ export function StoreProvider({ children, adapter }: { children: ReactNode; adap
         settings: { ...d.settings, displayName: (displayName ?? d.settings.displayName).trim().slice(0, 80) },
       })),
     updateSettings: (patch) => update((d) => ({ ...d, settings: { ...d.settings, ...patch } })),
-    setIntention: (domain, text) =>
+    setIntention: (category, text, domain) =>
       update((d) => {
         const date = dateKey();
-        const existing = d.intentions.find((i) => i.date === date);
         const t = now();
+        const existing = d.intentions.find((i) => i.date === date);
         if (existing) {
-          return { ...d, intentions: d.intentions.map((i) => (i.date === date ? { ...i, domain, text: text.trim(), updatedAt: t } : i)) };
+          return { ...d, intentions: d.intentions.map((i) => (i.date === date ? { ...i, category, domain, text: text.trim(), updatedAt: t } : i)) };
         }
-        return { ...d, intentions: [...d.intentions, { id: newId('int'), date, domain, text: text.trim(), createdAt: t, updatedAt: t, reflection: null }] };
+        return { ...d, intentions: [...d.intentions, { id: newId('int'), date, category, domain, text: text.trim(), createdAt: t, updatedAt: t }] };
       }),
-    clearIntention: (date) => update((d) => ({ ...d, intentions: d.intentions.filter((i) => i.date !== date) })),
-    reflectOnIntention: (date, outcome, note) =>
+    saveReflection: (draft) =>
+      update((d) => {
+        const date = dateKey();
+        const t = now();
+        const clean = Object.fromEntries(Object.entries(draft).map(([k, v]) => [k, v.trim()])) as ReflectionDraft;
+        const existing = d.reflections.find((r) => r.date === date);
+        if (existing) return { ...d, reflections: d.reflections.map((r) => (r.date === date ? { ...r, ...clean, updatedAt: t } : r)) };
+        return { ...d, reflections: [...d.reflections, { id: newId('ref'), date, ...clean, createdAt: t, updatedAt: t }] };
+      }),
+    setPracticeDraft: (practiceId, draft) =>
+      update((d) => ({ ...d, inProgress: { kind: 'practice', refId: practiceId, startedAt: d.inProgress?.refId === practiceId ? d.inProgress.startedAt : now(), draft } })),
+    completePractice: (practiceId, response) =>
       update((d) => ({
         ...d,
-        intentions: d.intentions.map((i) => (i.date === date ? { ...i, updatedAt: now(), reflection: { outcome, note: note.trim(), at: now() } } : i)),
+        practices: [...d.practices, { id: newId('prc'), practiceId, date: dateKey(), response: response.trim(), completedAt: now() }],
+        inProgress: d.inProgress?.kind === 'practice' && d.inProgress.refId === practiceId ? null : d.inProgress,
       })),
     recordAttempt: (scenarioId, optionId) =>
-      update((d) => ({ ...d, attempts: [...d.attempts, { id: newId('att'), scenarioId, optionId, at: now() }] })),
+      update((d) => ({
+        ...d,
+        attempts: [...d.attempts, { id: newId('att'), scenarioId, optionId, at: now() }],
+        inProgress: { kind: 'scenario', refId: scenarioId, startedAt: d.inProgress?.refId === scenarioId ? d.inProgress.startedAt : now(), draft: '' },
+      })),
+    completeScenario: (scenarioId, optionIds, note) =>
+      update((d) => ({
+        ...d,
+        completions: [...d.completions, { id: newId('cmp'), scenarioId, at: now(), optionIds, note: note.trim() }],
+        inProgress: d.inProgress?.kind === 'scenario' && d.inProgress.refId === scenarioId ? null : d.inProgress,
+      })),
+    clearInProgress: () => update((d) => ({ ...d, inProgress: null })),
     createJournal: (draft) => {
       const id = newId('jrn');
       const t = now();
       update((d) => ({ ...d, journal: [...d.journal, { ...draft, id, createdAt: t, updatedAt: t }] }));
       return id;
     },
-    updateJournal: (id, draft) =>
-      update((d) => ({ ...d, journal: d.journal.map((j) => (j.id === id ? { ...j, ...draft, updatedAt: now() } : j)) })),
+    updateJournal: (id, draft) => update((d) => ({ ...d, journal: d.journal.map((j) => (j.id === id ? { ...j, ...draft, updatedAt: now() } : j)) })),
     deleteJournal: (id) => update((d) => ({ ...d, journal: d.journal.filter((j) => j.id !== id) })),
     recordLibrary: (itemId, kind) =>
-      update((d) =>
-        d.library.some((r) => r.itemId === itemId && r.kind === kind) ? d : { ...d, library: [...d.library, { itemId, kind, at: now() }] },
-      ),
+      update((d) => (d.library.some((r) => r.itemId === itemId && r.kind === kind) ? d : { ...d, library: [...d.library, { itemId, kind, at: now() }] })),
     importData: (incoming, mode) => {
       repo.saveBackup(data);
       setData((d) => (mode === 'replace' ? incoming : mergeData(d, incoming)));
@@ -121,9 +145,8 @@ export function StoreProvider({ children, adapter }: { children: ReactNode; adap
     },
     resetAll: () => {
       repo.clearAll();
-      const fresh = emptyData();
-      first.current = true; // do not immediately write the empty state back
-      setData(fresh);
+      skipSave.current = true; // do not immediately write the empty state back
+      setData(emptyData());
       setLoadIssue(null);
     },
   };

@@ -2,7 +2,7 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
 import { DOMAINS } from '../data/domains';
-import type { DomainId } from '../lib/types';
+import type { DomainId } from '../types';
 
 export function PageHeader({ title, eyebrow, intro, back }: { title: string; eyebrow?: string; intro?: ReactNode; back?: string | true }) {
   const navigate = useNavigate();
@@ -22,13 +22,12 @@ export function PageHeader({ title, eyebrow, intro, back }: { title: string; eye
   );
 }
 
-const DOT: Record<DomainId, string> = { words: 'bg-words', perspective: 'bg-perspective', assumptions: 'bg-assumptions', effort: 'bg-effort' };
-const TXT: Record<DomainId, string> = { words: 'text-words', perspective: 'text-perspective', assumptions: 'text-assumptions', effort: 'text-effort' };
+const DOT: Record<DomainId, string> = { speech: 'bg-speech', personalisation: 'bg-personalisation', inquiry: 'bg-inquiry', effort: 'bg-effort' };
 
 export function DomainTag({ domain, className = '' }: { domain: DomainId; className?: string }) {
   return (
-    <span className={`inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.06em] ${TXT[domain]} ${className}`}>
-      <span className={`w-2 h-2 rounded-full ${DOT[domain]}`} aria-hidden="true" />
+    <span className={`inline-flex items-center gap-1.5 text-[11.5px] font-semibold uppercase tracking-[0.06em] text-muted ${className}`}>
+      <span className={`w-2 h-2 rounded-full shrink-0 ${DOT[domain]}`} aria-hidden="true" />
       {DOMAINS[domain].name}
     </span>
   );

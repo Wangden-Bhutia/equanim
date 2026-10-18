@@ -1,5 +1,5 @@
 import { emptyData, migrate, validateAppData, MigrationError } from './schema';
-import type { AppData } from './types';
+import type { AppData } from '../types';
 
 /** Minimal key-value persistence interface so the backing store can be swapped (e.g. for Capacitor Preferences or IndexedDB). */
 export interface StorageAdapter {

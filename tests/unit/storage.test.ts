@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { Repository, MemoryAdapter, DATA_KEY, CORRUPT_PREFIX } from '../../src/lib/storage';
-import { emptyData, migrate, MigrationError, SCHEMA_VERSION, validateAppData } from '../../src/lib/schema';
+import { Repository, MemoryAdapter, DATA_KEY, CORRUPT_PREFIX } from '../../src/storage/storage';
+import { emptyData, migrate, MigrationError, SCHEMA_VERSION, validateAppData } from '../../src/storage/schema';
 
 describe('repository', () => {
   it('returns empty data when nothing is stored', () => {
@@ -72,13 +72,47 @@ describe('migration engine', () => {
   });
   it('fails clearly when a step is missing or does not advance', () => {
     expect(() => migrate({ schemaVersion: 0 }, {}, 1)).toThrow(MigrationError);
-    expect(() => migrate({}, { 0: (d) => d }, 1)).toThrow(/did not advance/);
+    expect(() => migrate({}, { 0: (d: Record<string, unknown>) => d }, 1)).toThrow(/did not advance/);
     expect(() => migrate('nope')).toThrow(MigrationError);
   });
   it('validator rejects bad domains, dates and outcomes', () => {
     const d = emptyData();
     const t = new Date().toISOString();
-    const bad = { ...d, intentions: [{ id: 'i', date: '18-10-2026', domain: 'karma', text: 'x', createdAt: t, updatedAt: t, reflection: { outcome: 'great', note: '', at: t } }] };
+    const bad = { ...d, intentions: [{ id: 'i', date: '18-10-2026', category: 'karma', domain: 'words', text: 'x', createdAt: t, updatedAt: t }] };
     expect(validateAppData(bad).ok).toBe(false);
+  });
+});
+
+describe('v1 to v2 migration (Equanim 1.0 data)', () => {
+  const t = '2026-10-17T10:00:00.000Z';
+  const v1 = {
+    schemaVersion: 1, createdAt: t, onboardingCompletedAt: t,
+    settings: { displayName: 'Asha', streaksEnabled: true, theme: 'dark' },
+    intentions: [{ id: 'i1', date: '2026-10-17', domain: 'words', text: 'Say a clear no', createdAt: t, updatedAt: t, reflection: { outcome: 'afterwards', note: 'Late, but I saw it.', at: t } }],
+    attempts: [
+      { id: 'a1', scenarioId: 'p-one-word-reply', optionId: 'a', at: t },
+      { id: 'a2', scenarioId: 'p-one-word-reply', optionId: 'b', at: t },
+    ],
+    journal: [{ id: 'j1', createdAt: t, updatedAt: t, domain: 'perspective', scenarioId: null, situation: 'Friend cancelled', story: 'She does not care', response: 'Sulked', nextTime: 'Ask', note: 'extra' }],
+    library: [{ itemId: 'section-words', kind: 'read', at: t }, { itemId: 'essay-boundary-not-wall', kind: 'exercise', at: t }],
+  };
+  it('preserves every record under the new structure', () => {
+    const a = new MemoryAdapter();
+    a.set(DATA_KEY, JSON.stringify(v1));
+    const r = new Repository(a).load();
+    expect(r.issue).toBeNull();
+    const d = r.data;
+    expect(d.schemaVersion).toBe(2);
+    expect(d.settings).toEqual({ displayName: 'Asha', streaksEnabled: true, theme: 'dark' });
+    expect(d.intentions[0]).toMatchObject({ id: 'i1', category: 'custom', domain: 'speech', text: 'Say a clear no' });
+    expect(d.reflections).toHaveLength(1);
+    expect(d.reflections[0]!.happened).toMatch(/noticed afterwards.*Late, but I saw it/);
+    expect(d.attempts).toHaveLength(2);
+    expect(d.completions).toEqual([expect.objectContaining({ scenarioId: 'p-one-word-reply', optionIds: ['a', 'b'] })]);
+    expect(d.journal[0]).toMatchObject({ type: 'incident', domain: 'personalisation' });
+    expect(d.journal[0]!.answers).toMatchObject({ facts: 'Friend cancelled', interpretation: 'She does not care', response: 'Sulked', better: 'Ask', note: 'extra' });
+    expect(d.library).toEqual([{ itemId: 'section-speech', kind: 'opened', at: t }, { itemId: 'essay-boundaries', kind: 'exercise', at: t }]);
+    expect(d.inProgress).toBeNull();
+    expect(validateAppData(d).ok).toBe(true);
   });
 });

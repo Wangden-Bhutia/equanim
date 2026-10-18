@@ -1,10 +1,10 @@
 import { useRef, useState } from 'react';
 import { Download, Upload, RotateCcw, Trash2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../app/store';
-import { exportFileName, exportJson, parseImport, summarize, type DataSummary } from '../lib/transfer';
-import { formatShort } from '../lib/dates';
-import type { AppData, ThemePreference } from '../lib/types';
+import { exportFileName, exportJson, parseImport, summarize, type DataSummary } from '../storage/transfer';
+import { formatShort } from '../engine/dates';
+import type { AppData, ThemePreference } from '../types';
 import { ConfirmDialog, PageHeader } from '../components/ui';
 
 function readFileText(file: File): Promise<string> {
@@ -20,10 +20,11 @@ function readFileText(file: File): Promise<string> {
 function SummaryList({ s }: { s: DataSummary }) {
   return (
     <ul className="mt-2 text-[15px] text-ink space-y-0.5">
-      <li>{s.intentions} intentions ({s.reflections} with reflections)</li>
-      <li>{s.scenarios} scenarios explored ({s.attempts} responses)</li>
+      <li>{s.intentions} intentions and {s.reflections} evening reflections</li>
+      <li>{s.practices} daily practices completed</li>
+      <li>{s.scenarios} scenario completions ({s.attempts} responses explored)</li>
       <li>{s.journal} journal entries</li>
-      <li>{s.library} library records</li>
+      <li>{s.library} reading records</li>
     </ul>
   );
 }
@@ -80,7 +81,7 @@ export function Settings() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Settings & data" back="/more" />
+      <PageHeader title="Settings and Data" back="/more" />
 
       {status && <p role="status" className="card !p-4 bg-accentsoft border-accent/30 text-[15px]">{status}</p>}
 
@@ -116,7 +117,7 @@ export function Settings() {
 
       <section className="card" aria-labelledby="data-h">
         <h2 id="data-h" className="eyebrow">Your data</h2>
-        <p className="text-[15px] text-muted mt-1">Stored only on this device.</p>
+        <p className="text-[15px] text-muted mt-1">Everything is stored in this browser on this device, with no account or server. Clearing browser data, or using another browser or device, means your entries will not be there, so export a backup if they matter to you. The backup file is plain, unencrypted JSON. <Link to="/privacy" className="underline">Privacy and Storage</Link></p>
         <SummaryList s={summarize(data)} />
         <div className="mt-5 flex flex-col gap-3">
           <button className="btn-secondary" onClick={doExport}><Download size={17} aria-hidden="true" />Export backup (JSON)</button>

@@ -1,18 +1,18 @@
 import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { StoreProvider, useStore } from './store';
-import type { StorageAdapter } from '../lib/storage';
+import type { StorageAdapter } from '../storage/storage';
 import { Layout } from '../components/Layout';
 import { ErrorBoundary } from '../components/ErrorBoundary';
-import { Onboarding } from '../screens/Onboarding';
-import { Today } from '../screens/Today';
-import { Practise } from '../screens/Practise';
-import { ScenarioPlayer } from '../screens/ScenarioPlayer';
-import { JournalEditor, JournalList, JournalView } from '../screens/Journal';
-import { Library, LibraryDetail } from '../screens/Library';
-import { Progress } from '../screens/Progress';
-import { About, Framework, More, Privacy, References } from '../screens/Pages';
-import { Settings } from '../screens/Settings';
-import { NotFound } from '../screens/NotFound';
+import { Onboarding } from '../pages/Onboarding';
+import { Today } from '../pages/Today';
+import { Practise } from '../pages/Practise';
+import { ScenarioPlayer } from '../pages/ScenarioPlayer';
+import { JournalEditor, JournalList, JournalView } from '../pages/Journal';
+import { Library, LibraryDetail } from '../pages/Library';
+import { Progress } from '../pages/Progress';
+import { About, Framework, More, Privacy, References } from '../pages/Pages';
+import { Settings } from '../pages/Settings';
+import { NotFound } from '../pages/NotFound';
 
 function Gate() {
   const { data } = useStore();
