@@ -260,7 +260,7 @@ Before this audit, the branch's 1.0 → 1.1 upgrade had these problems. None of 
 | Meaning changes in migration | 1.0 check-in outcomes are kept verbatim as `legacyCheckIn`, shown with their original question. Journal "next time"/"anything else" keep their own labels. A 1.0 "read" becomes both opened and completed. |
 | Two tabs overwriting each other | Tabs reload on the `storage` event. |
 
-Remaining: a still-open **1.0 tab** (old code) can write v1 data after the upgrade. The next load migrates it again, so entries added in 1.1 *in another tab during that window* could be lost. This is low likelihood and documented.
+~~Remaining: a still-open 1.0 tab could overwrite upgraded data.~~ **Fixed** in the cross-tab fix (`docs/cross-tab-fix-brief.md`, design in `docs/data-safety.md`). 1.1 never writes 1.0's key, and 1.0 writes are merged record by record. 1.1 writes are serialised with Web Locks and re-read before every write.
 
 ## Accessibility fixes in this audit
 - The skip link broke hash routing.
@@ -272,3 +272,21 @@ Remaining: a still-open **1.0 tab** (old code) can write v1 data after the upgra
 
 ## Install App
 Covered: manifest (192, 512, 512 maskable, svg), service worker scope `/equanim/`, and Chromium installability errors = none (headless check). The prompt is held and offered only from the button. Accept, cancel and consumed states, `appinstalled`, standalone detection, the iOS guide by browser, and guidance for unsupported browsers are all handled. **The real prompt and iOS flow were not tried on devices** (see `docs/manual-testing.md`).
+
+
+# Cross-tab fix (brief: `docs/cross-tab-fix-brief.md`)
+- **Reproduced before the fix:** `tests/unit/cross-tab-proof.test.tsx` was committed on its own in `0b8efca`. All 3 tests failed on the code before the fix:
+  - an older snapshot from a 1.0 tab dropped a 1.1 entry;
+  - a missed notification dropped 1.0 entries;
+  - a 1.0 tab opened after the upgrade wiped the upgraded data.
+
+  All 3 pass after the fix.
+- **Design:** see `docs/data-safety.md`.
+  - Store key `equanim:store` with revisions.
+  - The 1.0 key is never written.
+  - Web Locks plus check-and-set.
+  - Changes are applied to the latest data.
+  - A record-level three-way merge; conflicting versions are set aside.
+  - Overwritten writes are detected and repaired.
+- **Regression tests:** `tests/unit/cross-tab.test.tsx` (brief tests 1–15 plus a no-loop test), and `tests/e2e/cross-tab.spec.ts` (real Chromium tabs, with a simulated 1.0 writer).
+- **Remaining risk:** without Web Locks, a tab closed in the microsecond window can lose its last change. This is documented.

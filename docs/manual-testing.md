@@ -55,6 +55,15 @@ Before starting, if Equanim 1.0 is already used on this phone, **export a backup
 2. Return to the app after more than 30 minutes, or reload. Expected: a calm "A new version of Equanim is ready" notice with **Update now**. Nothing reloads by itself.
 3. Tap Update now. Expected: one reload, and all entries are intact.
 
+## 3b Several tabs (desktop or phone browser)
+1. Open Equanim in two tabs. Add a journal entry in tab 1, then in tab 2 without reloading. Expected: both entries appear in both tabs, and in a new third tab.
+2. Edit the same journal entry in both tabs: open Edit in both, save tab 1, then save tab 2. Expected:
+   - tab 2's text is kept;
+   - a notice says the other version was saved;
+   - Settings and Data › Recovery copies lists "Edits set aside" containing tab 1's text.
+3. Put tab 2 in the background for a minute, add an entry in tab 1, then return to tab 2. Expected: the entry appears without reloading.
+4. If a 1.0 tab can still be produced (an old installed copy that has not updated yet), add an entry there. Expected: it appears in 1.1 after switching to it, and nothing in 1.1 disappears.
+
 ## 4 Screen reader: TalkBack on Android (exact steps)
 
 Turn TalkBack on: Settings › Accessibility › TalkBack › On. You can also hold both volume keys for 3 seconds if the shortcut is enabled.
@@ -94,4 +103,5 @@ Also repeat steps 1–7 with **VoiceOver** on an iPhone (Settings › Accessibil
 | iOS guide | Unit tests plus Playwright with an iPhone user agent | **Emulated**, not Safari |
 | Update flow | Playwright: changed service worker → "Update now" → takeover | Real Chromium |
 | Keyboard, focus visibility, focus management, touch-target size, nothing hidden behind the bottom bar, layout shift | Playwright and RTL | Real Chromium, not a screen reader |
+| Several tabs, 1.0 tab writing after the upgrade | Unit tests (deterministic, jsdom) and Playwright with several real Chromium tabs; the 1.0 writer is **simulated** | Real Chromium, simulated 1.0 |
 | Contrast, names, landmarks | axe-core on every screen in light and dark | Automated |

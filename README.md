@@ -122,6 +122,7 @@ The production build emits `sw.js`, generated in `vite.config.ts` with the exact
   - Settings and Data › Import backup validates the whole file, then offers Merge, Replace or Cancel.
   - Your current data is kept first as a restore point (**Undo last import**).
   - Backups from Equanim 1.0 import and upgrade automatically.
+- **Several tabs, or an old 1.0 tab still open:** changes are merged record by record and never overwrite each other. If the same item was changed in two places, the most recent version is kept and the other is saved under Recovery copies. Details and limits are in [`docs/data-safety.md`](docs/data-safety.md).
 - **Upgrades:** before a new version changes the stored format, Equanim keeps an exact copy of the old data. Settings and Data › **Recovery copies** lets you download it. If some saved values are damaged, the readable records are kept, and the original is kept as a recovery copy too. If a safety copy cannot be written (storage full), saving pauses rather than overwrite anything.
 
 ## Manual tests still needed

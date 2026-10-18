@@ -8,7 +8,7 @@ import { applyUpdate, useUpdateAvailable } from '../engine/sw';
 
 export function Layout() {
   const { pathname } = useLocation();
-  const { loadIssue, dismissLoadIssue, saveError } = useStore();
+  const { loadIssue, dismissLoadIssue, writeIssue, setAsideNotice, dismissSetAside } = useStore();
   const updateReady = useUpdateAvailable();
   useEffect(() => {
     window.scrollTo?.(0, 0);
@@ -68,7 +68,9 @@ export function Layout() {
           <div role="alert" className="mx-auto max-w-app lg:max-w-wide w-full px-5 pt-4">
             <div className="card !p-4 border-terracotta/50 bg-claysoft">
               <p className="text-sm text-ink">
-                {loadIssue.kind === 'newer' &&
+                {loadIssue.kind === 'newer' && loadIssue.backupKey === null &&
+                  'Equanim was updated in another tab or window. Reload this tab to continue. Nothing has been deleted, and this tab will not save until it is reloaded.'}
+                {loadIssue.kind === 'newer' && loadIssue.backupKey !== null &&
                   'Your saved data was created by a newer version of Equanim and could not be opened here, so Equanim started fresh. The original was kept on this device and has not been deleted.'}
                 {loadIssue.kind === 'unreadable' &&
                   'Your saved data could not be read, so Equanim started fresh. The unreadable copy was kept on this device and has not been deleted.'}
@@ -82,9 +84,32 @@ export function Layout() {
             </div>
           </div>
         )}
-        {saveError && (
+        {writeIssue && (
           <div role="alert" className="mx-auto max-w-app lg:max-w-wide w-full px-5 pt-4">
-            <p className="card !p-4 text-sm border-danger/40">Your latest change could not be saved on this device. Storage may be full or disabled. Consider exporting a backup from Settings and Data.</p>
+            <div className="card !p-4 border-danger/40">
+              <p className="text-sm text-ink">
+                {writeIssue.reason === 'newer'
+                  ? 'Another tab is running a newer version of Equanim, so this tab cannot save. Your latest change is still on screen'
+                  : writeIssue.reason === 'locked' || writeIssue.reason === 'backup-failed'
+                    ? 'Saving is paused because a safety copy could not be written. Your latest change is still on screen'
+                    : 'Your latest change could not be saved on this device yet. It is still on screen and will be saved with your next change'}
+                {writeIssue.unsavedKey ? ', and a copy was kept under Recovery copies in Settings and Data.' : '.'}
+                {writeIssue.reason === 'newer' ? ' Reload this tab to continue.' : ' Storage may be full: consider exporting a backup from Settings and Data.'}
+              </p>
+              {writeIssue.reason === 'newer' && (
+                <button className="btn-secondary mt-3 !min-h-[44px]" onClick={() => window.location.reload()}>Reload this tab</button>
+              )}
+            </div>
+          </div>
+        )}
+        {setAsideNotice > 0 && (
+          <div role="status" className="mx-auto max-w-app lg:max-w-wide w-full px-5 pt-4">
+            <div className="card !p-4">
+              <p className="text-sm text-ink">
+                The same {setAsideNotice === 1 ? 'item was' : 'items were'} changed in two places at once (for example, two tabs). The most recent version was kept, and the other was saved under Recovery copies in Settings and Data, so nothing was lost.
+              </p>
+              <button className="btn-ghost mt-2 !px-0" onClick={dismissSetAside}>Understood</button>
+            </div>
           </div>
         )}
 

@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { Repository, MemoryAdapter, DATA_KEY, CORRUPT_PREFIX, PRE_MIGRATION_PREFIX, RECOVERY_PREFIX, BACKUP_KEY } from '../../src/storage/storage';
+import { Repository, MemoryAdapter, DATA_KEY, STORE_KEY, CORRUPT_PREFIX, PRE_MIGRATION_PREFIX, RECOVERY_PREFIX, BACKUP_KEY } from '../../src/storage/storage';
+
+/** The 1.1 store's data. DATA_KEY is Equanim 1.0's key, which 1.1 reads but never writes. */
+const storeData = (a: MemoryAdapter) => (JSON.parse(a.get(STORE_KEY)!) as { data: { schemaVersion: number } }).data;
 import { exportJson, parseImport } from '../../src/storage/transfer';
 import { emptyData, migrate, MigrationError, SCHEMA_VERSION, validateAppData } from '../../src/storage/schema';
 
@@ -20,22 +23,22 @@ describe('repository', () => {
     expect(repo.save(d)).toBe(true);
     expect(repo.load().data.settings.displayName).toBe('Asha');
   });
-  it('keeps unreadable JSON under a separate key and starts fresh', () => {
+  it('keeps unreadable JSON under a separate key and starts fresh', async () => {
     const a = new MemoryAdapter();
     a.set(DATA_KEY, '{not json');
-    const r = new Repository(a).load();
+    const r = await new Repository(a).open();
     expect(r.issue?.kind).toBe('unreadable');
     const key = r.issue!.backupKey!;
     expect(a.get(key)).toBe('{not json');
     expect(key.startsWith(CORRUPT_PREFIX)).toBe(true);
     expect(r.data.journal).toEqual([]);
   });
-  it('recovers valid records from partly malformed current data and keeps the original', () => {
+  it('recovers valid records from partly malformed current data and keeps the original', async () => {
     const a = new MemoryAdapter();
     const good = { id: 'j1', type: 'free', answers: { text: 'kept' }, domain: null, scenarioId: null, themes: [], createdAt: T, updatedAt: T };
     const raw = JSON.stringify({ ...emptyData(), journal: [good, { id: 5 }, 'junk'], settings: { displayName: 'Asha', streaksEnabled: 'yes', theme: 'dark' } });
     a.set(DATA_KEY, raw);
-    const r = new Repository(a).load();
+    const r = await new Repository(a).open();
     expect(r.issue?.kind).toBe('partial');
     if (r.issue?.kind !== 'partial') throw new Error();
     expect(r.issue.dropped).toBe(3); // two journal items + the settings value
@@ -44,21 +47,21 @@ describe('repository', () => {
     expect(r.issue.backupKey.startsWith(RECOVERY_PREFIX)).toBe(true);
     expect(a.get(r.issue.backupKey)).toBe(raw);
   });
-  it('reports data from a newer schema without deleting it', () => {
+  it('reports data from a newer schema without deleting it', async () => {
     const a = new MemoryAdapter();
     const raw = JSON.stringify({ ...emptyData(), schemaVersion: SCHEMA_VERSION + 1 });
     a.set(DATA_KEY, raw);
-    const r = new Repository(a).load();
+    const r = await new Repository(a).open();
     expect(r.issue?.kind).toBe('newer');
     expect(a.get(r.issue!.backupKey!)).toBe(raw);
   });
-  it('migrates unversioned (v0) data and persists the migrated form', () => {
+  it('migrates unversioned (v0) data and persists the migrated form', async () => {
     const a = new MemoryAdapter();
     a.set(DATA_KEY, JSON.stringify({ createdAt: new Date().toISOString(), onboardingCompletedAt: null, settings: { displayName: 'Old' } }));
-    const r = new Repository(a).load();
+    const r = await new Repository(a).open();
     expect(r.issue).toBeNull();
     expect(r.data.settings).toEqual({ displayName: 'Old', streaksEnabled: false, theme: 'system' });
-    expect(JSON.parse(a.get(DATA_KEY)!).schemaVersion).toBe(SCHEMA_VERSION);
+    expect(storeData(a).schemaVersion).toBe(SCHEMA_VERSION);
   });
   it('clearAll removes only Equanim keys', () => {
     const a = new MemoryAdapter();
@@ -136,37 +139,37 @@ function v1Fixture() {
 }
 
 describe('Equanim 1.0 → 1.1 migration', () => {
-  const load = (raw: string) => {
+  const load = async (raw: string) => {
     const a = new MemoryAdapter();
     a.set(DATA_KEY, raw);
-    return { a, r: new Repository(a).load() };
+    return { a, r: await new Repository(a).open() };
   };
 
-  it('recognises 1.0 data and migrates it without an issue', () => {
-    const { r } = load(JSON.stringify(v1Fixture()));
+  it('recognises 1.0 data and migrates it without an issue', async () => {
+    const { r } = await load(JSON.stringify(v1Fixture()));
     expect(r.issue).toBeNull();
     expect(r.data.schemaVersion).toBe(2);
     expect(validateAppData(r.data).ok).toBe(true);
   });
 
-  it('keeps preferences and onboarding state', () => {
-    const { r } = load(JSON.stringify(v1Fixture()));
+  it('keeps preferences and onboarding state', async () => {
+    const { r } = await load(JSON.stringify(v1Fixture()));
     expect(r.data.settings).toEqual({ displayName: 'Asha', streaksEnabled: true, theme: 'dark' });
     expect(r.data.createdAt).toBe(t(1));
     expect(r.data.onboardingCompletedAt).toBe(t(1, 10));
   });
 
-  it('keeps every intention with its id, date, text and timestamps', () => {
+  it('keeps every intention with its id, date, text and timestamps', async () => {
     const v1 = v1Fixture();
-    const { r } = load(JSON.stringify(v1));
+    const { r } = await load(JSON.stringify(v1));
     expect(r.data.intentions).toHaveLength(4);
     v1.intentions.forEach((i, n) => {
       expect(r.data.intentions[n]).toEqual({ id: i.id, date: i.date, category: 'custom', domain: { words: 'speech', perspective: 'personalisation', assumptions: 'inquiry', effort: 'effort' }[i.domain], text: i.text, createdAt: i.createdAt, updatedAt: i.updatedAt });
     });
   });
 
-  it('keeps each evening check-in exactly, with its outcome, note and time', () => {
-    const { r } = load(JSON.stringify(v1Fixture()));
+  it('keeps each evening check-in exactly, with its outcome, note and time', async () => {
+    const { r } = await load(JSON.stringify(v1Fixture()));
     expect(r.data.reflections).toHaveLength(3);
     expect(r.data.reflections.map((x) => x.legacyCheckIn)).toEqual([
       { outcome: 'in-the-moment', note: 'Did it at lunch.' },
@@ -176,9 +179,9 @@ describe('Equanim 1.0 → 1.1 migration', () => {
     expect(r.data.reflections[0]).toMatchObject({ id: 'ref_int_a', date: '2026-10-02', createdAt: t(2, 21), updatedAt: t(2, 21), happened: '' });
   });
 
-  it('keeps every scenario attempt unchanged and derives one completion per explored scenario', () => {
+  it('keeps every scenario attempt unchanged and derives one completion per explored scenario', async () => {
     const v1 = v1Fixture();
-    const { r } = load(JSON.stringify(v1));
+    const { r } = await load(JSON.stringify(v1));
     expect(r.data.attempts).toEqual(v1.attempts);
     expect(r.data.completions).toEqual([
       { id: 'cmp_p-one-word-reply_migrated', scenarioId: 'p-one-word-reply', at: t(6, 8), optionIds: ['a', 'b'], note: '' },
@@ -187,8 +190,8 @@ describe('Equanim 1.0 → 1.1 migration', () => {
     ]);
   });
 
-  it('keeps every journal entry, its text under same-meaning questions or its original 1.0 label', () => {
-    const { r } = load(JSON.stringify(v1Fixture()));
+  it('keeps every journal entry, its text under same-meaning questions or its original 1.0 label', async () => {
+    const { r } = await load(JSON.stringify(v1Fixture()));
     expect(r.data.journal).toEqual([
       { id: 'jrn_full', type: 'incident', domain: 'personalisation', scenarioId: 'p-one-word-reply', themes: [], createdAt: t(2, 20), updatedAt: t(7),
         answers: { facts: 'Manager said ok.', interpretation: 'She is unhappy.', response: 'Rewrote it.', nextTime: 'Ask at check-in.', note: 'Tired that day.' } },
@@ -196,8 +199,8 @@ describe('Equanim 1.0 → 1.1 migration', () => {
     ]);
   });
 
-  it('keeps reading progress: 1.0 "read" stays shown as read, exercises stay tried', () => {
-    const { r } = load(JSON.stringify(v1Fixture()));
+  it('keeps reading progress: 1.0 "read" stays shown as read, exercises stay tried', async () => {
+    const { r } = await load(JSON.stringify(v1Fixture()));
     expect(r.data.library).toEqual([
       { itemId: 'section-speech', kind: 'opened', at: t(2, 7) },
       { itemId: 'section-speech', kind: 'completed', at: t(2, 7) },
@@ -208,32 +211,33 @@ describe('Equanim 1.0 → 1.1 migration', () => {
     ]);
   });
 
-  it('keeps the exact original before rewriting it, and the original can be imported back', () => {
+  it('keeps the exact original before rewriting it, and the original can be imported back', async () => {
     const raw = JSON.stringify(v1Fixture());
-    const { a } = load(raw);
+    const { a } = await load(raw);
     const copies = a.keys().filter((k) => k.startsWith(`${PRE_MIGRATION_PREFIX}v1:`));
     expect(copies).toHaveLength(1);
     expect(a.get(copies[0]!)).toBe(raw);
-    expect(JSON.parse(a.get(DATA_KEY)!).schemaVersion).toBe(2);
+    expect(storeData(a).schemaVersion).toBe(2);
+    expect(a.get(DATA_KEY)).toBe(raw); // 1.1 never rewrites the 1.0 key
     const imported = parseImport(raw);
     expect(imported.ok).toBe(true);
   });
 
-  it('is idempotent: reloading, or the same 1.0 data arriving again, creates no duplicates', () => {
+  it('is idempotent: reloading, or the same 1.0 data arriving again, creates no duplicates', async () => {
     const raw = JSON.stringify(v1Fixture());
-    const { a, r } = load(raw);
-    const again = new Repository(a).load();
+    const { a, r } = await load(raw);
+    const again = await new Repository(a).open();
     expect(again.data).toEqual(r.data);
     expect(a.keys().filter((k) => k.startsWith(PRE_MIGRATION_PREFIX))).toHaveLength(1); // no second copy when nothing migrates
     expect(migrate(JSON.parse(raw))).toEqual(migrate(JSON.parse(raw)));
     // e.g. an old 1.0 tab writes the same data back: the result is identical, ids included
-    const second = load(raw).r.data;
+    const second = (await load(raw)).r.data;
     expect(second).toEqual(r.data);
     const ids = (xs: { id: string }[]) => xs.map((x) => x.id);
     for (const k of ['intentions', 'reflections', 'attempts', 'completions', 'journal'] as const) expect(new Set(ids(second[k])).size).toBe(second[k].length);
   });
 
-  it('handles incomplete and malformed 1.0 records: keeps the rest, reports, and keeps the original', () => {
+  it('handles incomplete and malformed 1.0 records: keeps the rest, reports, and keeps the original', async () => {
     const v1 = v1Fixture() as Record<string, unknown> & ReturnType<typeof v1Fixture>;
     const bad = {
       ...v1,
@@ -244,7 +248,7 @@ describe('Equanim 1.0 → 1.1 migration', () => {
       library: [...v1.library, { itemId: 'section-words', kind: 'skimmed', at: t(9) }],
     };
     const raw = JSON.stringify(bad);
-    const { a, r } = load(raw);
+    const { a, r } = await load(raw);
     expect(r.issue?.kind).toBe('partial');
     if (r.issue?.kind !== 'partial') throw new Error();
     // Everything valid survives.
@@ -260,33 +264,33 @@ describe('Equanim 1.0 → 1.1 migration', () => {
     expect(a.keys().some((k) => k.startsWith(PRE_MIGRATION_PREFIX) && a.get(k) === raw)).toBe(true);
   });
 
-  it('never overwrites the original when the safety copy cannot be written', () => {
+  it('never overwrites the original when the safety copy cannot be written', async () => {
     const raw = JSON.stringify(v1Fixture());
     const a = new MemoryAdapter();
     a.set(DATA_KEY, raw);
     const realSet = a.set.bind(a);
     a.set = (k: string, v: string) => { if (k !== DATA_KEY) throw new Error('QuotaExceeded'); realSet(k, v); };
     const repo = new Repository(a);
-    const r = repo.load();
+    const r = await repo.open();
     expect(r.issue?.kind).toBe('backup-failed');
     expect(r.data.intentions).toHaveLength(4); // still readable in memory
     expect(repo.save(r.data)).toBe(false); // saving is paused
     expect(a.get(DATA_KEY)).toBe(raw); // the original is untouched
   });
 
-  it('never overwrites unreadable data when its copy cannot be written', () => {
+  it('never overwrites unreadable data when its copy cannot be written', async () => {
     const a = new MemoryAdapter();
     a.set(DATA_KEY, '{broken');
     const realSet = a.set.bind(a);
     a.set = (k: string, v: string) => { if (k !== DATA_KEY) throw new Error('QuotaExceeded'); realSet(k, v); };
     const repo = new Repository(a);
-    expect(repo.load().issue?.kind).toBe('backup-failed');
+    expect((await repo.open()).issue?.kind).toBe('backup-failed');
     expect(repo.save(emptyData())).toBe(false);
     expect(a.get(DATA_KEY)).toBe('{broken');
   });
 
-  it('lists safety copies so they can be downloaded, and erasing removes them only on reset', () => {
-    const { a } = load(JSON.stringify(v1Fixture()));
+  it('lists safety copies so they can be downloaded, and erasing removes them only on reset', async () => {
+    const { a } = await load(JSON.stringify(v1Fixture()));
     const repo = new Repository(a);
     const copies = repo.safetyCopies();
     expect(copies.map((c) => c.kind)).toEqual(['pre-migration']);
@@ -298,8 +302,9 @@ describe('Equanim 1.0 → 1.1 migration', () => {
 });
 
 describe('backup and restore', () => {
-  it('migrated data survives export, erase and import unchanged', () => {
-    const { r } = (() => { const a = new MemoryAdapter(); a.set(DATA_KEY, JSON.stringify(v1Fixture())); return { r: new Repository(a).load() }; })();
+  it('migrated data survives export, erase and import unchanged', async () => {
+    const a0 = new MemoryAdapter(); a0.set(DATA_KEY, JSON.stringify(v1Fixture()));
+    const r = await new Repository(a0).open();
     const file = exportJson(r.data);
     const fresh = new MemoryAdapter();
     const repo = new Repository(fresh);

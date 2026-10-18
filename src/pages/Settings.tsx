@@ -30,7 +30,7 @@ function SummaryList({ s }: { s: DataSummary }) {
   );
 }
 
-const COPY_LABEL = { unreadable: 'Unreadable data', 'pre-migration': 'Original before upgrade', recovered: 'Original before recovery' } as const;
+const COPY_LABEL = { unreadable: 'Unreadable data', 'pre-migration': 'Original before upgrade', recovered: 'Original before recovery', 'set-aside': 'Edits set aside', unsaved: 'Unsaved change' } as const;
 
 function download(name: string, text: string) {
   const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
@@ -51,7 +51,7 @@ function RecoveryCopies() {
   return (
     <section className="card" aria-labelledby="rec-h">
       <h2 id="rec-h" className="eyebrow">Recovery copies</h2>
-      <p className="text-[15px] text-muted mt-1">Equanim keeps an exact copy of your saved data before upgrading it or recovering from damaged values. These copies stay on this device until you erase all data. An "original before upgrade" copy can be imported here like a backup.</p>
+      <p className="text-[15px] text-muted mt-1">Equanim keeps an exact copy of your saved data before upgrading it or recovering from damaged values. When the same item was changed in two tabs at once, the version not kept is saved as "Edits set aside". A change that could not be saved is kept as "Unsaved change". These copies stay on this device until you erase all data. An "original before upgrade" copy can be imported here like a backup.</p>
       <ul className="mt-3 space-y-2">
         {copies.map((c) => (
           <li key={c.key} className="flex items-center justify-between gap-3 text-[15px]">

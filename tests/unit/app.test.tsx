@@ -2,16 +2,17 @@ import { describe, expect, it, beforeEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from '../../src/app/App';
-import { DATA_KEY } from '../../src/storage/storage';
+import { DATA_KEY, STORE_KEY } from '../../src/storage/storage';
 import { emptyData } from '../../src/storage/schema';
 import { exportJson } from '../../src/storage/transfer';
 import type { AppData } from '../../src/types';
 
 function onboarded(extra: Partial<AppData> = {}) {
   const d = { ...emptyData(), onboardingCompletedAt: new Date().toISOString(), ...extra };
-  localStorage.setItem(DATA_KEY, JSON.stringify(d));
+  localStorage.setItem(STORE_KEY, JSON.stringify({ format: 'equanim-store', schemaVersion: d.schemaVersion, revision: 1, nonce: 'seed', ancestors: [], legacy: null, data: d }));
 }
-const stored = () => JSON.parse(localStorage.getItem(DATA_KEY) ?? 'null') as AppData;
+/** The 1.1 store's data (an envelope under STORE_KEY). DATA_KEY is Equanim 1.0's key, which 1.1 never writes. */
+const stored = () => (JSON.parse(localStorage.getItem(STORE_KEY) ?? 'null') as { data: AppData } | null)?.data as AppData;
 const go = (hash: string) => { window.location.hash = hash; };
 const now = () => new Date().toISOString();
 
@@ -250,6 +251,7 @@ describe('settings and data', () => {
     await u.click(confirm);
     expect(await screen.findByRole('heading', { name: /clarity in the midst of life/i })).toBeInTheDocument();
     expect(localStorage.getItem(DATA_KEY)).toBeNull();
+    expect(localStorage.getItem(STORE_KEY)).toBeNull();
   });
 
   it('import shows a summary, can be cancelled, and merges on request', async () => {

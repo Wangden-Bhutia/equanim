@@ -29,13 +29,19 @@ export async function deliver(key: string) {
 
 export interface NewTab { store: () => Store; unmount: () => void }
 
-export async function openNewTab(props: Record<string, unknown> = {}): Promise<NewTab> {
+/** Mounts a tab without waiting for it to finish opening (its upgrade is still queued). */
+export function mountNewTab(props: Record<string, unknown> = {}): NewTab {
   let current: Store | null = null;
   const Probe = () => { current = useStore(); return null; };
   const P = StoreProvider as unknown as (p: { children: ReactNode } & Record<string, unknown>) => JSX.Element;
   const r = render(<P {...props}><Probe /></P>);
-  await settle();
   return { store: () => current as unknown as Store, unmount: r.unmount };
+}
+
+export async function openNewTab(props: Record<string, unknown> = {}): Promise<NewTab> {
+  const t = mountNewTab(props);
+  await settle();
+  return t;
 }
 
 /** A tab still running Equanim 1.0: loads once, keeps its own copy, and writes the whole store on every change. */
@@ -80,4 +86,35 @@ export function v1Seed() {
     journal: [{ id: 'jrn_seed', createdAt: t(2, 20), updatedAt: t(2, 20), domain: null, scenarioId: null, situation: 'seed', story: '', response: '', nextTime: '', note: '' }],
     library: [{ itemId: 'section-words', kind: 'read', at: t(2, 7) }],
   };
+}
+
+/** Deterministic Web Locks stand-in: one exclusive FIFO lock, shared by every tab given the same instance. */
+export class FakeLocks {
+  private q: Promise<unknown> = Promise.resolve();
+  requests = 0;
+  request<T>(_name: string, cb: () => T | Promise<T>): Promise<T> {
+    this.requests++;
+    const p = this.q.then(() => cb());
+    this.q = p.then(() => undefined, () => undefined);
+    return p;
+  }
+}
+
+/** Deterministic BroadcastChannel stand-in: messages are queued until flush(), or dropped with drop(). */
+export class FakeBus {
+  private subs = new Set<() => void>();
+  queued = 0;
+  channel() {
+    return {
+      post: () => { this.queued++; },
+      subscribe: (cb: () => void) => { this.subs.add(cb); return () => { this.subs.delete(cb); }; },
+    };
+  }
+  async flush() {
+    const n = this.queued;
+    this.queued = 0;
+    await act(async () => { for (let i = 0; i < n; i++) this.subs.forEach((cb) => cb()); });
+    await settle();
+  }
+  drop() { this.queued = 0; }
 }

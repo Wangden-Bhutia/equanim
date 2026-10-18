@@ -184,7 +184,7 @@ test('a new version waits for "Update now", then takes over', async ({ browser }
     await Promise.all([page.waitForEvent('load'), update.click()]);
     await expect(page.getByText('Morning intention')).toBeVisible();
     await expect.poll(() => page.evaluate(async () => caches.keys())).not.toContain(oldCache);
-    expect(await page.evaluate(() => localStorage.getItem('equanim:data'))).toContain('"onboardingCompletedAt":"');
+    expect(await page.evaluate(() => localStorage.getItem('equanim:store'))).toContain('"onboardingCompletedAt":"');
     await context.close();
   } finally {
     server.kill();
