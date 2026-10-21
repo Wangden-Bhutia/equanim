@@ -135,7 +135,7 @@ export function reminderIcs(time: string, startDay: string, now: Date = new Date
 export const NUDGE_EVERY_DAYS = 7;
 
 /** Days of use (days with any activity) after a given day key, exclusive. */
-function useDaysAfter(d: AppData, after: string | null): number {
+function usageDaysAfter(d: AppData, after: string | null): number {
   let n = 0;
   for (const day of activityDays(d)) if (after === null || day > after) n++;
   return n;
@@ -144,7 +144,7 @@ function useDaysAfter(d: AppData, after: string | null): number {
 /** True after 7 days of use since the last export (or ever), unless dismissed within the last 7 days of use. */
 export function shouldNudgeBackup(d: AppData): boolean {
   const lastExport = d.settings.lastExportAt ? keyFromIso(d.settings.lastExportAt) : null;
-  if (useDaysAfter(d, lastExport) < NUDGE_EVERY_DAYS) return false;
+  if (usageDaysAfter(d, lastExport) < NUDGE_EVERY_DAYS) return false;
   const dismissed = d.settings.backupNudgeDismissedOn;
-  return dismissed === null || useDaysAfter(d, dismissed) >= NUDGE_EVERY_DAYS;
+  return dismissed === null || usageDaysAfter(d, dismissed) >= NUDGE_EVERY_DAYS;
 }
