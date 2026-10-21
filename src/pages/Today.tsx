@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Check, Moon, Pencil, PlayCircle, Sunrise, Timer } from 'lucide-react';
+import { ProgrammeToday } from './programme/ProgrammeToday';
 import { useStore, type ReflectionDraft } from '../app/store';
 import { INTENTION_OPTIONS } from '../data/domains';
 import { SCENARIO_BY_ID } from '../data/scenarios';
@@ -205,20 +206,17 @@ function ContinueCard() {
   );
 }
 
-export function Today() {
+function ClassicToday({ offer }: { offer?: React.ReactNode }) {
   const { data } = useStore();
   const now = new Date();
   const today = dateKey(now);
   const dayNum = dayIndex(today);
   const intention = data.intentions.find((i) => i.date === today) ?? null;
-  const scenario = SCENARIO_BY_ID[suggestScenarioId(data, intention?.domain ?? null, dayNum)];
-  const scenarioDoneToday = scenario ? data.completions.some((c) => c.scenarioId === scenario.id && dateKey(new Date(c.at)) === today) : false;
   const streak = computeStreak(activityDays(data), today);
   const name = data.settings.displayName;
 
   return (
     <div className="space-y-5">
-      {/* A. Daily orientation */}
       <section aria-labelledby="orient-h">
         <p className="eyebrow">{formatLongDate(now)}{name ? ` · ${name}` : ''}</p>
         <h1 id="orient-h" className="text-[26px] lg:text-[30px] leading-snug font-semibold mt-2">{orientationFor(dayNum)}</h1>
@@ -226,26 +224,58 @@ export function Today() {
           <p className="text-sm text-muted mt-2">{streak.current} {streak.current === 1 ? 'day' : 'days'} in a row. Missing a day never removes what you have practised.</p>
         )}
       </section>
-
+      {offer}
       <ContinueCard />
       <Intention />
       <DailyPracticeCard practiceId={practiceForDay(intention?.domain ?? null, dayNum)} />
-
-      {scenario && (
-        <section className="card" aria-labelledby="sug-h">
-          <h2 id="sug-h" className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted mb-3">Scenario of the day</h2>
-          <DomainTag domain={scenario.domain} />
-          <h3 className="font-serif text-[20px] font-semibold mt-1">{scenario.title}</h3>
-          <p className="text-muted text-[15px] mt-1 line-clamp-2">{scenario.situation}</p>
-          {scenarioDoneToday ? (
-            <p className="flex items-center gap-2 font-medium text-accent mt-3"><Check size={18} aria-hidden="true" />Completed today</p>
-          ) : (
-            <Link to={`/practise/${scenario.id}`} className="btn-primary mt-4">Open scenario<ArrowRight size={17} aria-hidden="true" /></Link>
-          )}
-        </section>
-      )}
-
+      <ScenarioOfTheDay />
       <EveningReflection />
     </div>
   );
 }
+
+export function ScenarioOfTheDay() {
+  const { data } = useStore();
+  const today = dateKey();
+  const intention = data.intentions.find((i) => i.date === today) ?? null;
+  const scenario = SCENARIO_BY_ID[suggestScenarioId(data, intention?.domain ?? null, dayIndex(today))];
+  if (!scenario) return null;
+  const doneToday = data.completions.some((c) => c.scenarioId === scenario.id && dateKey(new Date(c.at)) === today);
+  return (
+    <section className="card" aria-labelledby="sug-h">
+      <h2 id="sug-h" className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted mb-3">Scenario of the day</h2>
+      <DomainTag domain={scenario.domain} />
+      <h3 className="font-serif text-[20px] font-semibold mt-1">{scenario.title}</h3>
+      <p className="text-muted text-[15px] mt-1 line-clamp-2">{scenario.situation}</p>
+      {doneToday ? (
+        <p className="flex items-center gap-2 font-medium text-accent mt-3"><Check size={18} aria-hidden="true" />Completed today</p>
+      ) : (
+        <Link to={`/practise/${scenario.id}`} className="btn-primary mt-4">Open scenario<ArrowRight size={17} aria-hidden="true" /></Link>
+      )}
+    </section>
+  );
+}
+
+/** Existing 1.1 users keep their Today exactly as it was, and are offered the programme rather than made to restart. */
+function ProgrammeOffer() {
+  const { startProgramme } = useStore();
+  return (
+    <section className="card border-accent/40" aria-labelledby="offer-h">
+      <p className="eyebrow">New</p>
+      <h2 id="offer-h" className="font-serif text-[21px] font-semibold mt-1">A 6-week programme, about 8 minutes a day</h2>
+      <p className="text-muted text-[15px] mt-1">A guided path through the four skills, one week each, with a short review every week. Your journal, practice history and settings stay exactly as they are.</p>
+      <div className="mt-4 flex flex-wrap gap-3">
+        <Link to="/values" onClick={() => startProgramme()} className="btn-primary">Start with Day 0<ArrowRight size={16} aria-hidden="true" /></Link>
+        <Link to="/programme" className="btn-secondary">See the plan</Link>
+      </div>
+    </section>
+  );
+}
+
+export function Today() {
+  const { data } = useStore();
+  if (data.programme) return <ProgrammeToday />;
+  return <ClassicToday offer={<ProgrammeOffer />} />;
+}
+
+export { ContinueCard, DailyPracticeCard, EveningReflection, Intention };

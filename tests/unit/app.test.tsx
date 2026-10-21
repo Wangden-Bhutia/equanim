@@ -20,53 +20,14 @@ beforeEach(() => {
   go('#/');
 });
 
-describe('onboarding sample journey', () => {
-  it('walks orientation → intention → scenario → reflection → first progress entry', async () => {
+describe('welcome', () => {
+  it('can be skipped to look around, which keeps the familiar Today and offers the programme', async () => {
     const u = userEvent.setup();
     render(<App />);
-    expect(await screen.findByRole('heading', { name: /clarity in the midst of life/i })).toBeInTheDocument();
-    await u.click(screen.getByRole('button', { name: 'Continue' }));
-    expect(screen.getByText(/not a replacement for professional mental-health support/i)).toBeInTheDocument();
-    expect(screen.getByText(/not affiliated with or endorsed by/i)).toBeInTheDocument();
-    await u.click(screen.getByRole('button', { name: 'Continue' }));
-    expect(screen.getByRole('heading', { name: /five places/i })).toBeInTheDocument();
-    await u.click(screen.getByRole('button', { name: 'Continue' }));
-    expect(screen.getByText(/clearing your browser data/i)).toBeInTheDocument();
-    await u.type(screen.getByLabelText(/what should equanim call you/i), 'Asha');
-    await u.click(screen.getByRole('button', { name: 'Continue' }));
-    expect(screen.getByText(/1 of 4 · Orientation/)).toBeInTheDocument();
-    await u.click(screen.getByRole('button', { name: 'Continue' }));
-    await u.click(screen.getByText('Ask before assuming'));
-    await u.click(screen.getByRole('button', { name: 'Set intention and continue' }));
-    expect(await screen.findByRole('heading', { name: 'The one-word reply' })).toBeInTheDocument();
-    expect(stored().intentions[0]).toMatchObject({ category: 'ask-before-assuming', domain: 'inquiry' });
-    expect(stored().settings.displayName).toBe('Asha');
-    await u.click(screen.getByRole('button', { name: /notice the story forming/i }));
-    expect(screen.getByRole('heading', { name: 'Observing the story' })).toBeInTheDocument();
-    expect(screen.getByText('What it may accomplish')).toBeInTheDocument();
-    expect(screen.getByText('Risks and assumptions')).toBeInTheDocument();
-    expect(screen.getByText('Why this matters')).toBeInTheDocument();
-    // A second option gives different, option-specific feedback.
-    await u.click(screen.getByRole('button', { name: /reply right away/i }));
-    expect(screen.getByRole('heading', { name: 'Seeking reassurance' })).toBeInTheDocument();
-    expect(screen.getByText('Another response to consider')).toBeInTheDocument();
-    await u.type(screen.getByLabelText(/personal note/i), 'It was just ok.');
-    await u.click(screen.getByRole('button', { name: 'Mark scenario complete' }));
-    await u.click(await screen.findByRole('link', { name: /see your first progress entry/i }));
-    expect(await screen.findByRole('heading', { name: 'Your first progress entry.' })).toBeInTheDocument();
-    expect(screen.getByText('Morning intention set')).toBeInTheDocument();
-    expect(screen.getByText('2 responses explored')).toBeInTheDocument();
-    expect(screen.getByText('It was just ok.')).toBeInTheDocument();
-    expect(stored().completions[0]).toMatchObject({ scenarioId: 'p-one-word-reply', optionIds: ['b', 'c'], note: 'It was just ok.' });
-    await u.click(screen.getByRole('link', { name: 'Open Progress' }));
-    expect(await screen.findByRole('heading', { level: 1, name: 'Progress' })).toBeInTheDocument();
-    expect(screen.getByText('1/35')).toBeInTheDocument();
-  });
-  it('can be skipped at any step', async () => {
-    const u = userEvent.setup();
-    render(<App />);
-    await u.click(await screen.findByRole('button', { name: 'Skip' }));
+    await u.click(await screen.findByRole('button', { name: 'Look around without starting' }));
     expect(await screen.findByText('Morning intention')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /6-week programme/ })).toBeInTheDocument();
+    expect(stored().programme).toBeNull();
   });
 });
 
@@ -77,13 +38,17 @@ describe('navigation', () => {
     render(<App />);
     // Both the desktop sidebar and the mobile bar are labelled Primary; jsdom renders both.
     const nav = screen.getAllByRole('navigation', { name: 'Primary' }).at(-1)!;
-    for (const tab of ['Practise', 'Journal', 'Library', 'Progress']) {
+    expect(within(nav).getAllByRole('link').map((l) => l.textContent)).toEqual(['Today', 'Journal', 'Library', 'Progress']);
+    for (const [tab, h1] of [['Journal', 'Journal'], ['Progress', 'Progress'], ['Library', 'Keep practising']]) {
       await u.click(within(nav).getByRole('link', { name: tab }));
-      expect(await screen.findByRole('heading', { level: 1, name: tab })).toBeInTheDocument();
+      expect(await screen.findByRole('heading', { level: 1, name: h1 })).toBeInTheDocument();
     }
+    // Scenario practice lives inside Keep practising, and the old /practise route still works.
+    await u.click(screen.getByRole('link', { name: /Practice scenarios/ }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Practice scenarios' })).toBeInTheDocument();
     await u.click(within(nav).getByRole('link', { name: 'Today' }));
     expect(await screen.findByText('Morning intention')).toBeInTheDocument();
-    for (const name of ['About Equanim', 'Practice Framework', 'Reading and References', 'Settings and Data', 'Privacy and Storage']) {
+    for (const name of ['The 6-week programme', 'About Equanim', 'Practice Framework', 'Reading and References', 'Settings and Data', 'Privacy and Storage']) {
       await u.click(screen.getByRole('link', { name: /^More:/ }));
       const list = await screen.findByRole('heading', { level: 1, name: 'More' });
       expect(list).toBeInTheDocument();
@@ -165,7 +130,7 @@ describe('scenario completion and revisits', () => {
     await u.click(screen.getByRole('button', { name: 'Mark scenario complete' }));
     expect(await screen.findByText('Scenario completed')).toBeInTheDocument();
     go('#/practise');
-    await screen.findByRole('heading', { level: 1, name: 'Practise' });
+    await screen.findByRole('heading', { level: 1, name: 'Practice scenarios' });
     go('#/practise/p-traffic-horn');
     expect(await screen.findByText(/You completed this on/)).toBeInTheDocument();
     expect(screen.getByText('Your history with this scenario')).toBeInTheDocument();
@@ -249,7 +214,7 @@ describe('settings and data', () => {
     await u.type(within(dlg).getByLabelText(/type erase/i), 'erase');
     expect(confirm).toBeEnabled();
     await u.click(confirm);
-    expect(await screen.findByRole('heading', { name: /clarity in the midst of life/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /respond, rather than react/i })).toBeInTheDocument();
     expect(localStorage.getItem(DATA_KEY)).toBeNull();
     expect(localStorage.getItem(STORE_KEY)).toBeNull();
   });
@@ -287,7 +252,7 @@ describe('settings and data', () => {
   it('shows a calm notice when stored data is unreadable, without deleting it', async () => {
     localStorage.setItem(DATA_KEY, '{{broken');
     render(<App />);
-    expect(await screen.findByRole('heading', { name: /clarity in the midst of life/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /respond, rather than react/i })).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent(/could not be opened/);
     expect(Object.keys(localStorage).some((k) => k.startsWith('equanim:unreadable:'))).toBe(true);
   });

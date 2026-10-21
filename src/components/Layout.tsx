@@ -8,6 +8,7 @@ import { applyUpdate, useUpdateAvailable } from '../engine/sw';
 
 export function Layout() {
   const { pathname } = useLocation();
+  const onAlso = (also?: string[]) => !!also?.some((p) => pathname === p || pathname.startsWith(`${p}/`));
   const { loadIssue, dismissLoadIssue, writeIssue, setAsideNotice, dismissSetAside } = useStore();
   const updateReady = useUpdateAvailable();
   useEffect(() => {
@@ -24,10 +25,10 @@ export function Layout() {
         <p className="text-xs text-muted px-3 mt-1">Clarity in the midst of life.</p>
         <nav aria-label="Primary" className="mt-8">
           <ul className="space-y-1">
-            {PRIMARY_NAV.map(({ to, label, icon: Icon, end }) => (
+            {PRIMARY_NAV.map(({ to, label, icon: Icon, end, also }) => (
               <li key={to}>
                 <NavLink to={to} end={end}
-                  className={({ isActive }) => `flex items-center gap-3 rounded-xl px-3 min-h-[44px] text-[15px] font-medium ${isActive ? 'bg-accent text-onaccent' : 'text-ink hover:bg-surface2'}`}>
+                  className={({ isActive: navActive }) => `flex items-center gap-3 rounded-xl px-3 min-h-[44px] text-[15px] font-medium ${(navActive || onAlso(also)) ? 'bg-accent text-onaccent' : 'text-ink hover:bg-surface2'}`}>
                   <Icon size={19} aria-hidden="true" />{label}
                 </NavLink>
               </li>
@@ -120,15 +121,15 @@ export function Layout() {
 
       {/* Mobile bottom navigation */}
       <nav aria-label="Primary" className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-surface border-t border-line pb-[env(safe-area-inset-bottom)]">
-        <ul className="mx-auto max-w-app grid grid-cols-5">
-          {PRIMARY_NAV.map(({ to, label, icon: Icon, end }) => (
+        <ul className="mx-auto max-w-app grid grid-cols-4">
+          {PRIMARY_NAV.map(({ to, label, icon: Icon, end, also }) => (
             <li key={to}>
               <NavLink to={to} end={end}
-                className={({ isActive }) => `flex flex-col items-center justify-center gap-1 h-16 text-[11.5px] font-medium ${isActive ? 'text-accent' : 'text-muted'}`}>
-                {({ isActive }) => (
+                className={({ isActive: navActive }) => `flex flex-col items-center justify-center gap-1 h-16 text-[11.5px] font-medium ${(navActive || onAlso(also)) ? 'text-accent' : 'text-muted'}`}>
+                {({ isActive: navActive }) => (
                   <>
-                    <span className={`flex items-center justify-center w-12 h-7 rounded-full ${isActive ? 'bg-accentsoft' : ''}`}>
-                      <Icon size={20} aria-hidden="true" strokeWidth={isActive ? 2.2 : 1.8} />
+                    <span className={`flex items-center justify-center w-12 h-7 rounded-full ${(navActive || onAlso(also)) ? 'bg-accentsoft' : ''}`}>
+                      <Icon size={20} aria-hidden="true" strokeWidth={(navActive || onAlso(also)) ? 2.2 : 1.8} />
                     </span>
                     {label}
                   </>

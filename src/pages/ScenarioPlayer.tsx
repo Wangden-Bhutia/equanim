@@ -11,7 +11,7 @@ import { NotFound } from './NotFound';
 export function ScenarioPlayer() {
   const { id = '' } = useParams();
   const [params] = useSearchParams();
-  const isFirst = params.get('first') === '1';
+  const fromSession = /^w\d+d\d$/.test(params.get('from') ?? '') ? params.get('from') : null;
   const scenario = SCENARIO_BY_ID[id];
   const { data, recordAttempt, completeScenario } = useStore();
   const [selected, setSelected] = useState<string | null>(null);
@@ -47,10 +47,10 @@ export function ScenarioPlayer() {
 
   return (
     <article>
-      <PageHeader title={scenario.title} back="/practise" />
+      <PageHeader title={scenario.title} back={fromSession ? `/session/${fromSession}` : '/practise'} />
       <div className="flex items-center gap-2 -mt-3 mb-4"><DomainTag domain={scenario.domain} /><span className="text-xs text-muted">· {scenario.setting}</span></div>
-      {isFirst && (
-        <p className="card !p-4 bg-accentsoft border-sage text-[15px] mb-4"><span className="block eyebrow mb-1">Sample journey · 3 of 4 · Scenario and reflection</span>Read the situation, then pick the response closest to what you might actually do. There is no single right answer. Afterwards, answer the reflection question in a line or two.</p>
+      {fromSession && (
+        <p className="card !p-4 bg-accentsoft border-sage text-[15px] mb-4">A harder scenario from your session. Pick the response closest to what you might actually do; there is no single right answer.</p>
       )}
       {history.length > 0 && !completedNow && (
         <p className="text-sm text-muted mb-4">You completed this on {formatShort(history[0]!.at)}. Revisiting adds to your history; nothing is erased.</p>
@@ -111,8 +111,8 @@ export function ScenarioPlayer() {
           <h2 id="done-h" ref={doneRef} tabIndex={-1} className="flex items-center gap-2 font-semibold text-accent outline-none"><Check size={18} aria-hidden="true" />Scenario completed</h2>
           <p className="text-[15px] text-muted mt-1">Saved to your history{note.trim() ? ', with your note' : ''}.</p>
           <div className="mt-4 flex flex-col sm:flex-row gap-3">
-            {isFirst ? (
-              <Link to="/welcome?step=journey-done" className="btn-primary">See your first progress entry<ArrowRight size={17} aria-hidden="true" /></Link>
+            {fromSession ? (
+              <Link to={`/session/${fromSession}`} className="btn-primary">Back to the session<ArrowRight size={17} aria-hidden="true" /></Link>
             ) : (
               <>
                 {next && <Link to={`/practise/${next.id}`} className="btn-primary">Next scenario<ArrowRight size={17} aria-hidden="true" /></Link>}

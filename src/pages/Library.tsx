@@ -29,7 +29,14 @@ export function Library() {
   const read = new Set(data.library.filter((r) => r.kind === 'completed').map((r) => r.itemId));
   return (
     <div>
-      <PageHeader title="Library" intro="Short, original readings of two to four minutes. Each ends with a question, an exercise and a scenario, because reading is only the start." />
+      <PageHeader eyebrow="Library" title="Keep practising" intro="Free practice outside the programme: everyday scenarios, and short original readings of two to four minutes." />
+      <Link to="/practise" className="card !p-4 flex items-center gap-3 hover:bg-surface2 transition-colors mb-8">
+        <div className="flex-1 min-w-0">
+          <p className="font-serif text-[18px] font-semibold">Practice scenarios</p>
+          <p className="text-sm text-muted">Everyday situations across the four skills, with feedback on each response.</p>
+        </div>
+        <ChevronRight size={20} className="text-muted shrink-0" aria-hidden="true" />
+      </Link>
       <h2 className="eyebrow mb-3">The four domains</h2>
       <ul className="space-y-3 mb-8">{LIBRARY.filter((i) => i.kind === 'section').map((i) => <Row key={i.id} item={i} read={read.has(i.id)} />)}</ul>
       <h2 className="eyebrow mb-3">Essays</h2>
