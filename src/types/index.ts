@@ -7,6 +7,12 @@ export interface Settings {
   displayName: string;
   streaksEnabled: boolean;
   theme: ThemePreference;
+  /** When the user last exported a backup (ISO), or null. Shown in Settings; drives the gentle backup nudge. */
+  lastExportAt: string | null;
+  /** Day key on which the backup nudge was last dismissed, or null. */
+  backupNudgeDismissedOn: string | null;
+  /** Preferred reminder time "HH:MM" for the downloadable calendar reminder, or null. */
+  reminderTime: string | null;
 }
 
 export type IntentionCategory =
@@ -101,6 +107,85 @@ export interface InProgress {
   draft: string;
 }
 
+// ---------- 6-week programme (schema v3) ----------
+
+/** Programme enrolment. Null until the user chooses to start; existing users are offered it, never forced. */
+export interface ProgrammeState {
+  startedAt: string;
+  /** Set once the short independence and safety screen has been shown after the first completed session. */
+  disclaimerSeenAt: string | null;
+}
+
+export type SessionMode = 'think' | 'write';
+
+/** A completed programme session. The id is derived from the session id, so a session completes once. */
+export interface SessionCompletion {
+  id: string;
+  sessionId: string;
+  completedAt: string;
+  updatedAt: string;
+  mode: SessionMode;
+  /** Free-text answers keyed by prompt id. Empty when the user chose to think it through. */
+  answers: Record<string, string>;
+  /** Option ids chosen in recognise-the-pattern items, keyed by item id. */
+  choices: Record<string, string>;
+}
+
+/** One of the three chosen values, with the user's sentence. Id = value id. */
+export interface ValueChoice {
+  id: string;
+  sentence: string;
+  updatedAt: string;
+}
+
+/** Self-ratings. Kind 'start' is Day 0; 'finish' is Week 6 (PR 2). Not a validated instrument. */
+export interface Baseline {
+  id: string;
+  kind: 'start' | 'finish';
+  ratings: Record<string, number>;
+  situations: string[];
+  completedAt: string;
+  updatedAt: string;
+}
+
+export interface WeeklyReview {
+  id: string;
+  week: number;
+  worked: string;
+  gotInWay: string;
+  noticed: string;
+  /** 1–5 self-rating for the week's domain, or null if skipped. */
+  rating: number | null;
+  completedAt: string;
+  updatedAt: string;
+}
+
+export type PlanOutcome = 'not-came-up' | 'tried' | 'didnt-manage';
+
+/** "When ___, I will ___". One per day; the evening check records what happened. */
+export interface IfThenPlan {
+  id: string;
+  date: string;
+  domain: DomainId | null;
+  when: string;
+  then: string;
+  outcome: PlanOutcome | null;
+  note: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Spaced-retrieval history for one question. Id = question id. */
+export interface RecallRecord {
+  id: string;
+  /** Day key when the question was first answered; reviews fall due 2, 7 and 21 days later. */
+  firstSeen: string;
+  /** Day keys of later answers (quick recall). */
+  reviewed: string[];
+  lastCorrect: boolean;
+  updatedAt: string;
+}
+
 export interface AppData {
   schemaVersion: number;
   createdAt: string;
@@ -114,4 +199,11 @@ export interface AppData {
   journal: JournalEntry[];
   library: LibraryRecord[];
   inProgress: InProgress | null;
+  programme: ProgrammeState | null;
+  sessions: SessionCompletion[];
+  values: ValueChoice[];
+  baselines: Baseline[];
+  reviews: WeeklyReview[];
+  plans: IfThenPlan[];
+  recall: RecallRecord[];
 }

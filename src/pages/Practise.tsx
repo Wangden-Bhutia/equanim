@@ -23,7 +23,7 @@ export function Practise() {
 
   return (
     <div>
-      <PageHeader title="Practise" intro="Everyday situations across four domains. Choose a response, read what it may accomplish and what it risks, then reflect. There is rarely one obviously right answer." />
+      <PageHeader eyebrow="Keep practising" title="Practice scenarios" back="/library" intro="Everyday situations across four domains. Choose a response, read what it may accomplish and what it risks, then reflect. There is rarely one obviously right answer." />
       <div className="flex flex-wrap gap-2 mb-5" role="group" aria-label="Filter by area">
         {[{ id: 'all' as const, name: 'All' }, ...DOMAIN_LIST].map((d) => (
           <button

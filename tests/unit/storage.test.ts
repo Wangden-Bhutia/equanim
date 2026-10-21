@@ -43,7 +43,7 @@ describe('repository', () => {
     if (r.issue?.kind !== 'partial') throw new Error();
     expect(r.issue.dropped).toBe(3); // two journal items + the settings value
     expect(r.data.journal).toEqual([good]);
-    expect(r.data.settings).toEqual({ displayName: 'Asha', streaksEnabled: false, theme: 'dark' });
+    expect(r.data.settings).toEqual({ displayName: 'Asha', streaksEnabled: false, theme: 'dark', lastExportAt: null, backupNudgeDismissedOn: null, reminderTime: null });
     expect(r.issue.backupKey.startsWith(RECOVERY_PREFIX)).toBe(true);
     expect(a.get(r.issue.backupKey)).toBe(raw);
   });
@@ -60,7 +60,7 @@ describe('repository', () => {
     a.set(DATA_KEY, JSON.stringify({ createdAt: new Date().toISOString(), onboardingCompletedAt: null, settings: { displayName: 'Old' } }));
     const r = await new Repository(a).open();
     expect(r.issue).toBeNull();
-    expect(r.data.settings).toEqual({ displayName: 'Old', streaksEnabled: false, theme: 'system' });
+    expect(r.data.settings).toEqual({ displayName: 'Old', streaksEnabled: false, theme: 'system', lastExportAt: null, backupNudgeDismissedOn: null, reminderTime: null });
     expect(storeData(a).schemaVersion).toBe(SCHEMA_VERSION);
   });
   it('clearAll removes only Equanim keys', () => {
@@ -148,13 +148,13 @@ describe('Equanim 1.0 → 1.1 migration', () => {
   it('recognises 1.0 data and migrates it without an issue', async () => {
     const { r } = await load(JSON.stringify(v1Fixture()));
     expect(r.issue).toBeNull();
-    expect(r.data.schemaVersion).toBe(2);
+    expect(r.data.schemaVersion).toBe(SCHEMA_VERSION);
     expect(validateAppData(r.data).ok).toBe(true);
   });
 
   it('keeps preferences and onboarding state', async () => {
     const { r } = await load(JSON.stringify(v1Fixture()));
-    expect(r.data.settings).toEqual({ displayName: 'Asha', streaksEnabled: true, theme: 'dark' });
+    expect(r.data.settings).toEqual({ displayName: 'Asha', streaksEnabled: true, theme: 'dark', lastExportAt: null, backupNudgeDismissedOn: null, reminderTime: null });
     expect(r.data.createdAt).toBe(t(1));
     expect(r.data.onboardingCompletedAt).toBe(t(1, 10));
   });
@@ -217,7 +217,7 @@ describe('Equanim 1.0 → 1.1 migration', () => {
     const copies = a.keys().filter((k) => k.startsWith(`${PRE_MIGRATION_PREFIX}v1:`));
     expect(copies).toHaveLength(1);
     expect(a.get(copies[0]!)).toBe(raw);
-    expect(storeData(a).schemaVersion).toBe(2);
+    expect(storeData(a).schemaVersion).toBe(SCHEMA_VERSION);
     expect(a.get(DATA_KEY)).toBe(raw); // 1.1 never rewrites the 1.0 key
     const imported = parseImport(raw);
     expect(imported.ok).toBe(true);
@@ -257,7 +257,7 @@ describe('Equanim 1.0 → 1.1 migration', () => {
     expect(r.data.attempts).toHaveLength(5);
     expect(r.data.journal.map((j) => j.id)).toEqual(['jrn_full', 'jrn_sparse']);
     expect(r.data.library).toHaveLength(6);
-    expect(r.data.settings).toEqual({ displayName: '', streaksEnabled: false, theme: 'system' });
+    expect(r.data.settings).toEqual({ displayName: '', streaksEnabled: false, theme: 'system', lastExportAt: null, backupNudgeDismissedOn: null, reminderTime: null });
     expect(r.issue.dropped).toBe(7);
     // The original is kept twice over: before migration and before recovery.
     expect(a.get(r.issue.backupKey)).toBe(raw);

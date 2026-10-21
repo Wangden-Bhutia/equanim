@@ -22,34 +22,20 @@ async function axe(page: Page) {
 
 const primary = (page: Page) => page.getByRole('navigation', { name: 'Primary' }).locator('visible=true');
 
-test('[SIMULATED phone: Pixel 7 profile in Chromium, not a real device] onboarding sample journey, a full day of practice, every screen in light and dark', async ({ page, context }) => {
+test('[SIMULATED phone: Pixel 7 profile in Chromium, not a real device] welcome, free practice (Keep practising) and a full classic day, every screen in light and dark', async ({ page, context }) => {
   await page.goto('./');
   await page.evaluate(() => localStorage.clear());
   await page.goto('./');
 
-  // Onboarding information steps
-  await expect(page.getByRole('heading', { name: 'Clarity in the midst of life.' })).toBeVisible();
+  // Welcome (one screen), then look around without starting the programme: the free practice still works as before.
+  await expect(page.getByRole('heading', { level: 1, name: /Respond, rather than react/ })).toBeVisible();
   await noHorizontalOverflow(page);
   await axe(page);
   await shot(page, '01-onboarding-welcome');
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.getByText(/not a replacement for professional mental-health support/)).toBeVisible();
-  await shot(page, '02-onboarding-not-therapy');
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await shot(page, '03-onboarding-five-sections');
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByLabel(/what should equanim call you/i).fill('Asha');
-  await shot(page, '04-onboarding-storage');
-  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Look around without starting' }).click();
+  await expect(page.getByRole('heading', { name: /6-week programme/ })).toBeVisible();
 
-  // Sample journey: orientation → intention → scenario + reflection → progress entry
-  await expect(page.getByText(/1 of 4 · Orientation/)).toBeVisible();
-  await shot(page, '05-journey-orientation');
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByText('Ask before assuming').click();
-  await shot(page, '06-journey-intention');
-  await axe(page);
-  await page.getByRole('button', { name: 'Set intention and continue' }).click();
+  await page.goto('./#/practise/p-one-word-reply');
   await expect(page.getByRole('heading', { name: 'The one-word reply' })).toBeVisible();
   await shot(page, '07-journey-scenario');
   await page.getByRole('button', { name: /notice the story forming/i }).click();
@@ -61,11 +47,10 @@ test('[SIMULATED phone: Pixel 7 profile in Chromium, not a real device] onboardi
   await page.getByRole('heading', { name: 'Why this matters' }).scrollIntoViewIfNeeded();
   await shot(page, '09-scenario-reflection');
   await page.getByRole('button', { name: 'Mark scenario complete' }).click();
-  await page.getByRole('link', { name: /see your first progress entry/i }).click();
-  await expect(page.getByRole('heading', { name: 'Your first progress entry.' })).toBeVisible();
-  await axe(page);
-  await shot(page, '10-journey-progress-entry');
-  await page.getByRole('link', { name: 'Go to Today' }).click();
+  await expect(page.getByText('Scenario completed')).toBeVisible();
+  await page.goto('./#/');
+  await page.getByText('Ask before assuming').click();
+  await page.getByRole('button', { name: 'Set intention' }).click();
 
   // Today
   await expect(page.getByText('Morning intention')).toBeVisible();
@@ -90,9 +75,10 @@ test('[SIMULATED phone: Pixel 7 profile in Chromium, not a real device] onboardi
   await shot(page, '14-today-full', true);
   await axe(page);
 
-  // Practise
-  await primary(page).getByRole('link', { name: 'Practise' }).click();
-  await expect(page.getByRole('heading', { level: 1, name: 'Practise' })).toBeVisible();
+  // Keep practising: scenarios live inside the Library tab
+  await primary(page).getByRole('link', { name: 'Library' }).click();
+  await page.getByRole('link', { name: /Practice scenarios/ }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Practice scenarios' })).toBeVisible();
   await noHorizontalOverflow(page);
   await axe(page);
   await shot(page, '15-practise');
@@ -179,7 +165,7 @@ test('[SIMULATED phone: Pixel 7 profile in Chromium, not a real device] onboardi
   const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: /export backup/i }).click()]);
   const json = JSON.parse(fs.readFileSync((await download.path())!, 'utf8'));
   expect(json.app).toBe('equanim');
-  expect(json.data.schemaVersion).toBe(2);
+  expect(json.data.schemaVersion).toBe(3);
   expect(json.data.journal).toHaveLength(3);
   expect(json.data.reflections).toHaveLength(1);
 
@@ -247,11 +233,11 @@ test('desktop sidebar, and the app makes no third-party requests', async ({ page
   });
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto('./');
-  await page.getByRole('button', { name: 'Skip' }).click();
+  await page.getByRole('button', { name: 'Look around without starting' }).click();
   await expect(page.getByText('Morning intention')).toBeVisible();
   const sidebar = page.getByRole('complementary', { name: 'Sidebar' });
   await expect(sidebar).toBeVisible();
-  for (const name of ['Today', 'Practise', 'Journal', 'Library', 'Progress', 'About Equanim', 'Practice Framework', 'Reading and References', 'Settings and Data', 'Privacy and Storage']) {
+  for (const name of ['Today', 'Journal', 'Library', 'Progress', 'The 6-week programme', 'About Equanim', 'Practice Framework', 'Reading and References', 'Settings and Data', 'Privacy and Storage']) {
     await expect(sidebar.getByRole('link', { name, exact: true })).toBeVisible();
   }
   await axe(page);
@@ -261,8 +247,9 @@ test('desktop sidebar, and the app makes no third-party requests', async ({ page
     await expect(page.locator('main h1').first()).toBeVisible();
     await noHorizontalOverflow(page);
   }
-  await sidebar.getByRole('link', { name: 'Practise', exact: true }).click();
-  await expect(page.getByRole('heading', { level: 1, name: 'Practise' })).toBeVisible();
+  await page.goto('./#/practise');
+  await expect(page.getByRole('heading', { level: 1, name: 'Practice scenarios' })).toBeVisible();
+  await expect(sidebar.getByRole('link', { name: 'Library', exact: true })).toHaveClass(/bg-accent/);
   await shot(page, '41-desktop-practise');
   expect(foreign).toEqual([]);
 });
@@ -272,7 +259,7 @@ test('works offline after the first visit', async ({ page, context, baseURL }) =
   await page.goto('./');
   await page.evaluate(async () => { await navigator.serviceWorker.ready; });
   await page.waitForFunction(() => !!navigator.serviceWorker.controller);
-  await page.getByRole('button', { name: 'Skip' }).click();
+  await page.getByRole('button', { name: 'Look around without starting' }).click();
   await expect(page.getByText('Morning intention')).toBeVisible();
   await context.setOffline(true);
   await page.reload();

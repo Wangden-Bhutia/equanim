@@ -5,7 +5,13 @@ import { StoreProvider, useStore } from './store';
 import type { StorageAdapter } from '../storage/storage';
 import { Layout } from '../components/Layout';
 import { ErrorBoundary } from '../components/ErrorBoundary';
-import { Onboarding } from '../pages/Onboarding';
+import { Welcome } from '../pages/programme/Welcome';
+import { Values } from '../pages/programme/Values';
+import { Baseline } from '../pages/programme/Baseline';
+import { Session } from '../pages/programme/Session';
+import { Review } from '../pages/programme/Review';
+import { Plan } from '../pages/programme/Plan';
+import { Finish, ProgrammeOverview, ProgrammeWeek } from '../pages/programme/Overview';
 import { Today } from '../pages/Today';
 import { Practise } from '../pages/Practise';
 import { ScenarioPlayer } from '../pages/ScenarioPlayer';
@@ -21,11 +27,11 @@ function Gate() {
   const loc = useLocation();
   const onboarded = !!data.onboardingCompletedAt;
   // Information pages stay reachable before onboarding (e.g. Privacy linked from outside).
-  const openPaths = ['/about', '/privacy', '/references', '/framework'];
+  const openPaths = ['/about', '/privacy', '/references', '/framework', '/session/taster'];
   if (!onboarded && loc.pathname !== '/welcome' && !openPaths.includes(loc.pathname)) return <Navigate to="/welcome" replace />;
   return (
     <Routes>
-      <Route path="/welcome" element={<Onboarding />} />
+      <Route path="/welcome" element={<Welcome />} />
       <Route element={<Layout />}>
         <Route index element={<Today />} />
         <Route path="practise" element={<Practise />} />
@@ -37,6 +43,14 @@ function Gate() {
         <Route path="library" element={<Library />} />
         <Route path="library/:id" element={<LibraryDetail />} />
         <Route path="progress" element={<Progress />} />
+        <Route path="programme" element={<ProgrammeOverview />} />
+        <Route path="programme/week/:n" element={<ProgrammeWeek />} />
+        <Route path="session/:id" element={<Session />} />
+        <Route path="values" element={<Values />} />
+        <Route path="baseline" element={<Baseline />} />
+        <Route path="review/:week" element={<Review />} />
+        <Route path="plan" element={<Plan />} />
+        <Route path="finish" element={<Finish />} />
         <Route path="more" element={<More />} />
         <Route path="about" element={<About />} />
         <Route path="framework" element={<Framework />} />

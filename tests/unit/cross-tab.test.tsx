@@ -106,7 +106,7 @@ describe('cross-tab data safety', () => {
   });
 
   it('5: the same record edited in two tabs: the newest edit is kept, the other is set aside, the user is told', async () => {
-    localStorage.setItem(STORE_KEY, JSON.stringify({ format: 'equanim-store', schemaVersion: 2, revision: 1, nonce: 'n0', ancestors: [], legacy: null, data: { ...emptyData(), journal: [entry('j1', 'original')] } }));
+    localStorage.setItem(STORE_KEY, JSON.stringify({ format: 'equanim-store', schemaVersion: 3, revision: 1, nonce: 'n0', ancestors: [], legacy: null, data: { ...emptyData(), journal: [entry('j1', 'original')] } }));
     const bus = new FakeBus();
     const locks = new FakeLocks();
     const b = await openNewTab({ locks, channel: bus.channel() });
@@ -265,7 +265,7 @@ describe('cross-tab data safety', () => {
   it('14: a refused write (another tab runs a newer version) keeps the content on screen and as a copy', async () => {
     const bus = new FakeBus();
     const b = await openNewTab({ locks: new FakeLocks(), channel: bus.channel() });
-    const newer = JSON.stringify({ format: 'equanim-store', schemaVersion: 3, revision: 9, nonce: 'future', ancestors: [], legacy: null, data: { schemaVersion: 3 } });
+    const newer = JSON.stringify({ format: 'equanim-store', schemaVersion: 99, revision: 9, nonce: 'future', ancestors: [], legacy: null, data: { schemaVersion: 99 } });
     localStorage.setItem(STORE_KEY, newer); // a newer Equanim in another tab; this tab missed the message
     b.store().createJournal(draft('typed before the other tab updated'));
     await settle();

@@ -41,6 +41,9 @@ export function activityDays(d: AppData): Set<string> {
   d.completions.forEach((c) => days.add(keyFromIso(c.at)));
   d.journal.forEach((j) => days.add(keyFromIso(j.createdAt)));
   d.library.filter((r) => r.kind !== 'opened').forEach((r) => days.add(keyFromIso(r.at)));
+  d.sessions.forEach((s) => days.add(keyFromIso(s.completedAt)));
+  d.plans.forEach((p) => days.add(p.date));
+  d.reviews.forEach((r) => days.add(keyFromIso(r.completedAt)));
   return days;
 }
 

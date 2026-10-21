@@ -169,7 +169,7 @@ test('a new version waits for "Update now", then takes over', async ({ browser }
     const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const page = await context.newPage();
     await page.goto(url);
-    await page.getByRole('button', { name: 'Skip' }).click();
+    await page.getByRole('button', { name: 'Look around without starting' }).click();
     await page.evaluate(async () => { await navigator.serviceWorker.ready; });
     await page.waitForFunction(() => !!navigator.serviceWorker.controller);
     const oldCache = await page.evaluate(async () => (await caches.keys()).find((k) => k.startsWith('equanim-')));

@@ -233,6 +233,11 @@ export class Repository {
       }
       if (e) {
         env = e;
+        if (e.schemaVersion < SCHEMA_VERSION) {
+          // An older 1.x store (for example 1.1, schema 2): keep the exact stored text before it is upgraded.
+          this.copyKey(`${PRE_MIGRATION_PREFIX}store-v${e.schemaVersion}:`, storeRaw, copies);
+          dirty = true;
+        }
         const r = this.readDocument(JSON.stringify(e.data), []);
         if (r.data && !r.issue) data = r.data;
         else if (r.data && r.issue?.kind === 'partial') {

@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react';
-import { Download, Upload, RotateCcw, Trash2 } from 'lucide-react';
+import { CalendarPlus, Download, Upload, RotateCcw, Trash2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../app/store';
 import { exportFileName, exportJson, parseImport, summarize, type DataSummary } from '../storage/transfer';
-import { formatShort } from '../engine/dates';
+import { dateKey, formatShort } from '../engine/dates';
+import { reminderIcs } from '../engine/programme';
 import type { AppData, ThemePreference } from '../types';
 import { ConfirmDialog, PageHeader } from '../components/ui';
 import { InstallApp } from '../components/InstallApp';
@@ -69,6 +70,38 @@ function RecoveryCopies() {
   );
 }
 
+function ReminderSection() {
+  const { data, updateSettings } = useStore();
+  const [time, setTime] = useState(data.settings.reminderTime ?? '08:00');
+  const get = () => {
+    const ok = /^([01]\d|2[0-3]):[0-5]\d$/.test(time);
+    if (!ok) return;
+    updateSettings({ reminderTime: time });
+    const blob = new Blob([reminderIcs(time, dateKey())], { type: 'text/calendar' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'equanim-daily-reminder.ics';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  return (
+    <section className="card" aria-labelledby="rem-h">
+      <h2 id="rem-h" className="eyebrow">Daily reminder (optional)</h2>
+      <p className="text-[15px] text-muted mt-1">Equanim cannot send notifications. Instead, download a calendar file with a daily event at the time you choose. <strong className="text-ink font-semibold">It only reminds you once you add it to your calendar app</strong>; to stop it, delete the event there.</p>
+      <div className="mt-4 flex flex-wrap items-end gap-3">
+        <div>
+          <label htmlFor="rem-time" className="label">Time</label>
+          <input id="rem-time" type="time" className="field !w-auto" value={time} onChange={(e) => setTime(e.target.value)} />
+        </div>
+        <button className="btn-secondary" onClick={get} disabled={!time}><CalendarPlus size={17} aria-hidden="true" />Download calendar reminder (.ics)</button>
+      </div>
+    </section>
+  );
+}
+
 export function Settings() {
   const store = useStore();
   const { data, updateSettings } = store;
@@ -92,6 +125,7 @@ export function Settings() {
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+    store.markExported();
     setStatus('Backup file created. Keep it somewhere safe; it contains your private entries.');
   };
 
@@ -163,9 +197,12 @@ export function Settings() {
         <InstallApp variant="card" />
       </section>
 
+      <ReminderSection />
+
       <section className="card" aria-labelledby="data-h">
         <h2 id="data-h" className="eyebrow">Your data</h2>
         <p className="text-[15px] text-muted mt-1">Everything is stored in this browser on this device, with no account or server. Clearing browser data, or using another browser or device, means your entries will not be there, so export a backup if they matter to you. The backup file is plain, unencrypted JSON. <Link to="/privacy" className="underline">Privacy and Storage</Link></p>
+        <p className="text-[14.5px] mt-2" data-testid="last-export">Last export: {data.settings.lastExportAt ? formatShort(data.settings.lastExportAt) : 'never'}</p>
         <SummaryList s={summarize(data)} />
         <div className="mt-5 flex flex-col gap-3">
           <button className="btn-secondary" onClick={doExport}><Download size={17} aria-hidden="true" />Export backup (JSON)</button>

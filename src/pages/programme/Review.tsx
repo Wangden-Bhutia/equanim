@@ -1,0 +1,79 @@
+import { useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { ArrowRight, Check, Lock } from 'lucide-react';
+import { useStore } from '../../app/store';
+import { OUTCOME_LABELS, REVIEW_PROMPTS, RATING_LABELS, SESSION_BY_ID, WEEKS } from '../../data/programme';
+import { keyFromIso } from '../../engine/dates';
+import { isUnlocked, weekDayLabel } from '../../engine/programme';
+import { PageHeader } from '../../components/ui';
+import { Confirmation } from '../../components/Confirmation';
+import { NotFound } from '../NotFound';
+
+export function Review() {
+  const { week: w = '' } = useParams();
+  const week = Number(w);
+  const { data, saveReview } = useStore();
+  const def = WEEKS.find((x) => x.week === week);
+  const sid = `w${week}d6`;
+  const prev = data.reviews.find((r) => r.week === week);
+  const [form, setForm] = useState({ worked: prev?.worked ?? '', gotInWay: prev?.gotInWay ?? '', noticed: prev?.noticed ?? '' });
+  const [rating, setRating] = useState<number | null>(prev?.rating ?? null);
+  const [saved, setSaved] = useState(false);
+  if (!def || !SESSION_BY_ID[sid]) return <NotFound />;
+  const header = <PageHeader eyebrow={`${weekDayLabel(sid)} · Weekly review · about 15 min`} title={`Week ${week} review: ${def.title}`} back="/" />;
+  if (!SESSION_BY_ID[sid]!.available) return <div>{header}<p className="card">This review arrives in the next update.</p></div>;
+  if (!isUnlocked(data, sid)) {
+    return <div>{header}<div className="card flex gap-3"><Lock size={20} className="text-muted shrink-0" aria-hidden="true" /><p>The review opens after this week’s other sessions. There is no deadline.</p></div></div>;
+  }
+  // The week's plans, for context. A week is the seven days before the review was opened, or the plans made since the week started.
+  const weekStart = data.sessions.find((s) => s.sessionId === `w${week}d1`)?.completedAt;
+  const plans = data.plans.filter((p) => !weekStart || p.date >= keyFromIso(weekStart));
+  const counts = { 'not-came-up': 0, tried: 0, 'didnt-manage': 0 } as Record<keyof typeof OUTCOME_LABELS, number>;
+  plans.forEach((p) => { if (p.outcome) counts[p.outcome] += 1; });
+
+  return (
+    <div className="space-y-4">
+      {header}
+      <section className="card" aria-labelledby="rv-plans">
+        <h2 id="rv-plans" className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted mb-2">This week’s plans</h2>
+        {plans.length === 0 ? <p className="text-muted text-[15px]">No if-then plans recorded this week. That is fine: the review still works.</p> : (
+          <>
+            <p className="text-[15px]">{plans.length} {plans.length === 1 ? 'plan' : 'plans'} made.</p>
+            <ul className="mt-2 text-[14.5px] text-muted space-y-1">
+              {(Object.keys(counts) as (keyof typeof counts)[]).map((k) => <li key={k}>{OUTCOME_LABELS[k]}: {counts[k]}</li>)}
+            </ul>
+          </>
+        )}
+      </section>
+      <form className="card space-y-4" onSubmit={(e) => { e.preventDefault(); saveReview(week, { ...form, rating }); setSaved(true); }}>
+        {REVIEW_PROMPTS.map((p) => (
+          <div key={p.id}>
+            <label htmlFor={`rv-${p.id}`} className="label">{p.label}</label>
+            <textarea id={`rv-${p.id}`} className="field min-h-[80px]" maxLength={2000} value={form[p.id as keyof typeof form]}
+              onChange={(e) => setForm({ ...form, [p.id]: e.target.value })} />
+            {p.hint && <p className="text-[13px] text-muted mt-1">{p.hint}</p>}
+          </div>
+        ))}
+        <fieldset>
+          <legend className="label">Overall, how often did you use this week’s skill? <span className="text-muted font-normal">(optional)</span></legend>
+          <div className="grid grid-cols-5 gap-1.5">
+            {RATING_LABELS.map((label, i) => (
+              <label key={label} className={`flex flex-col items-center justify-center text-center cursor-pointer rounded-lg border min-h-[56px] px-1 ${rating === i + 1 ? 'border-accent bg-accentsoft' : 'border-line'}`}>
+                <input type="radio" name="rv-rating" className="sr-only" checked={rating === i + 1} onChange={() => setRating(i + 1)} />
+                <span className="font-semibold">{i + 1}</span><span className="text-[10.5px] leading-tight text-muted">{label}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        <button type="submit" className="btn-primary">{prev ? 'Save review' : 'Complete review'}</button>
+      </form>
+      {saved && (
+        <div className="card">
+          <Confirmation focus className="flex items-center gap-2 font-medium text-accent"><Check size={18} aria-hidden="true" />Week {week} review saved</Confirmation>
+          <p className="text-muted text-[15px] mt-2">Tomorrow is a rest day: no session. Keep your plan going if you like.</p>
+          <Link to="/" className="btn-primary mt-3">Back to Today<ArrowRight size={16} aria-hidden="true" /></Link>
+        </div>
+      )}
+    </div>
+  );
+}

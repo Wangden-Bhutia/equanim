@@ -5,7 +5,7 @@ const onboard = async (page: Page) => {
   await page.goto('./');
   await page.evaluate(() => localStorage.clear());
   await page.goto('./');
-  await page.getByRole('button', { name: 'Skip' }).click();
+  await page.getByRole('button', { name: 'Look around without starting' }).click();
   await expect(page.getByText('Morning intention')).toBeVisible();
 };
 
@@ -58,20 +58,23 @@ test('keyboard: skip link, then complete a scenario without a mouse', async ({ p
 test('narrow width: nothing hidden behind the bottom navigation, no overflow, no layout shift on load', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
   await onboard(page);
-  for (const route of ['#/', '#/practise', '#/journal', '#/library', '#/progress', '#/settings', '#/more', '#/practise/a-landlord-call']) {
+  for (const route of ['#/', '#/practise', '#/journal', '#/library', '#/progress', '#/settings', '#/more', '#/practise/a-landlord-call', '#/programme', '#/plan', '#/session/taster']) {
     await page.goto(`./${route}`);
     await page.locator('main h1').first().waitFor();
-    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-    const r = await page.evaluate(() => {
+    // Scroll to the bottom and measure in one step, retrying while the page is still settling (fonts and late
+    // layout can grow it after the first scroll, which made this check flaky in CI).
+    const measure = () => page.evaluate(() => {
+      window.scrollTo(0, document.documentElement.scrollHeight);
+      const atBottom = Math.ceil(window.scrollY + window.innerHeight) >= document.documentElement.scrollHeight - 1;
       const nav = document.querySelectorAll('nav[aria-label="Primary"]');
       const bar = nav[nav.length - 1]!.getBoundingClientRect();
       const main = document.querySelector('main')!;
       const items = Array.from(main.querySelectorAll('a, button, input, textarea, p, h2')).filter((e) => (e as HTMLElement).offsetParent);
       const last = items[items.length - 1]!.getBoundingClientRect();
-      return { lastBottom: last.bottom, barTop: bar.top, overflow: document.documentElement.scrollWidth - window.innerWidth };
+      return { atBottom, hidden: last.bottom > bar.top, overflow: document.documentElement.scrollWidth - window.innerWidth };
     });
-    expect(r.overflow, route).toBeLessThanOrEqual(0);
-    expect(r.lastBottom, `${route}: last content is behind the bottom bar`).toBeLessThanOrEqual(r.barTop);
+    await expect.poll(async () => { const m = await measure(); return m.atBottom && !m.hidden; }, { message: `${route}: last content is behind the bottom bar` }).toBe(true);
+    expect((await measure()).overflow, route).toBeLessThanOrEqual(0);
   }
   // Cumulative layout shift while Today loads.
   await page.goto('./#/');
@@ -85,7 +88,7 @@ test('narrow width: nothing hidden behind the bottom navigation, no overflow, no
 
 test('touch targets: interactive controls are at least 44px tall on core screens', async ({ page }) => {
   await onboard(page);
-  for (const route of ['#/', '#/practise', '#/journal', '#/settings', '#/practise/p-one-word-reply']) {
+  for (const route of ['#/', '#/practise', '#/journal', '#/settings', '#/practise/p-one-word-reply', '#/programme', '#/plan', '#/session/taster']) {
     await page.goto(`./${route}`);
     await page.locator('main h1').first().waitFor();
     const small = await page.evaluate(() =>
