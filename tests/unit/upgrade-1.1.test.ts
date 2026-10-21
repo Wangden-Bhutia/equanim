@@ -138,9 +138,9 @@ describe('programme data across tabs (record-level merge)', () => {
   const ses = (sessionId: string, at: string) => ({ id: `ses_${sessionId}`, sessionId, completedAt: at, updatedAt: at, mode: 'think' as const, answers: {}, choices: {} });
   const plan = (when: string, at: string) => ({ id: `pln_${when}`, date: '2026-10-21', domain: 'personalisation' as const, when, then: 'pause', outcome: null, note: '', createdAt: at, updatedAt: at });
   it('keeps sessions completed in different tabs, and sets aside the older of two plans for the same day', () => {
-    const base: AppData = { ...emptyData(), programme: { startedAt: T(20), disclaimerSeenAt: null } };
+    const base: AppData = { ...emptyData(), programme: { startedAt: T(20), disclaimerSeenAt: null, maintenanceStartedAt: null } };
     const ours = { ...base, sessions: [ses('w1d1', T(21, 8))], plans: [plan('meeting', T(21, 8))] };
-    const theirs = { ...base, sessions: [ses('w1d2', T(21, 9))], plans: [plan('call', T(21, 9))], programme: { startedAt: T(20), disclaimerSeenAt: T(21, 9) } };
+    const theirs = { ...base, sessions: [ses('w1d2', T(21, 9))], plans: [plan('call', T(21, 9))], programme: { startedAt: T(20), disclaimerSeenAt: T(21, 9), maintenanceStartedAt: null } };
     const m = merge3(base, ours, theirs);
     expect(m.data.sessions.map((s) => s.sessionId).sort()).toEqual(['w1d1', 'w1d2']);
     expect(m.data.plans.map((p) => p.when)).toEqual(['call']);
@@ -149,7 +149,7 @@ describe('programme data across tabs (record-level merge)', () => {
   });
   it('an enrolment in one tab is never undone by another tab that had not enrolled', () => {
     const base = emptyData();
-    const m = merge3(base, base, { ...base, programme: { startedAt: T(21), disclaimerSeenAt: null } });
+    const m = merge3(base, base, { ...base, programme: { startedAt: T(21), disclaimerSeenAt: null, maintenanceStartedAt: null } });
     expect(m.data.programme?.startedAt).toBe(T(21));
   });
 });

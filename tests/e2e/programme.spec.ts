@@ -1,14 +1,15 @@
 /**
- * The 6-week programme, Week 0 and Week 1, end to end in EMULATED Chromium (Pixel 7 profile; not a real device).
+ * The full 6-week programme, Day 0 to maintenance, end to end in EMULATED Chromium (Pixel 7 profile; not a real device).
  * axe runs on every screen at 390x844 in light and dark, and at 360px wide.
- * Set PROG_SHOTS to a folder to save screenshots.
+ * Set PROG_SHOTS (Weeks 0–1) and PROG2_SHOTS (Weeks 2–6, finish, maintenance) to folders to save screenshots.
  */
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import fs from 'node:fs';
 
-const SHOTS = process.env.PROG_SHOTS;
-test.setTimeout(240000);
+let SHOTS = process.env.PROG_SHOTS;
+const SHOTS2 = process.env.PROG2_SHOTS;
+test.setTimeout(900000);
 
 async function axe(page: Page, where: string) {
   const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
@@ -55,7 +56,7 @@ const startNext = async (page: Page) => {
   await page.getByRole('link', { name: /Start (next )?session/ }).click();
 };
 
-test('[SIMULATED phone] welcome → Day 0 → Week 1 sessions → if-then plan → evening check → weekly review', async ({ page }) => {
+test('[SIMULATED phone] full 6-week path: welcome → Day 0 → Weeks 1–6 → Week 6 snapshot → finish → maintenance', async ({ page }) => {
   await page.goto('./');
   await page.evaluate(() => localStorage.clear());
   await page.goto('./');
@@ -160,15 +161,82 @@ test('[SIMULATED phone] welcome → Day 0 → Week 1 sessions → if-then plan �
   await expect(page.getByText('Week 1 review saved')).toBeVisible();
 
   await page.goto('./#/');
-  await expect(page.getByText(/Week 2 arrives in the next update/)).toBeVisible();
+  await expect(page.getByText('Week 2 · Day 8 of 42')).toBeVisible();
   await check(page, '15-today-week1-done');
 
   // Everything is saved under the 1.1 store key; the 1.0 key is never written.
   const saved = await page.evaluate(() => ({ store: JSON.parse(localStorage.getItem('equanim:store') ?? 'null'), legacy: localStorage.getItem('equanim:data') }));
   expect(saved.legacy).toBeNull();
-  expect(saved.store.schemaVersion).toBe(3);
+  expect(saved.store.schemaVersion).toBe(4);
   expect(saved.store.data.sessions.map((s: { sessionId: string }) => s.sessionId)).toEqual(['w0d0', 'w1d1', 'w1d2', 'w1d3', 'w1d4', 'w1d5', 'w1d6']);
   expect(saved.store.data.plans[0]).toMatchObject({ outcome: 'didnt-manage' });
+
+  // ---------- Weeks 2–6, every session, through Today ----------
+  SHOTS = SHOTS2;
+  const shotAt: Record<string, string> = { w2d1: '31-w2d1-inquiry-understand', w3d3: '32-w3d3-speech-rehearse', w4d4: '33-w4d4-effort-apply', w5d2: '34-w5d2-integration', w5d4: '35-w5d4-hardest-situation' };
+  for (let week = 2; week <= 6; week++) {
+    for (let day = 1; day <= 6; day++) {
+      const id = `w${week}d${day}`;
+      await startNext(page);
+      if (day === 6) {
+        await expect(page.getByRole('heading', { level: 1, name: new RegExp(`Week ${week} review`) })).toBeVisible();
+        await page.getByLabel('What worked this week?').fill(`Week ${week}: catching it earlier.`);
+        await page.getByRole('button', { name: 'Complete review' }).click();
+        await expect(page.getByText(`Week ${week} review saved`)).toBeVisible();
+        continue;
+      }
+      if (id === 'w6d1') {
+        await expect(page.getByRole('heading', { level: 1, name: 'Where you are now' })).toBeVisible();
+        const g = page.locator('main fieldset');
+        const k = await g.count();
+        for (let i = 0; i < k; i++) await g.nth(i).locator('label').nth(Math.min(4, (i % 4) + 2)).click();
+        await page.getByRole('button', { name: 'Save today’s snapshot' }).click();
+        await expect(page).toHaveURL(/#\/session\/w6d2/);
+        await check(page, '36-w6d2-compare');
+        await page.getByRole('button', { name: 'Complete session' }).click();
+        await expect(page.getByText('Session complete')).toBeVisible();
+        day = 2; // the snapshot leads straight into Day 2, which is now done
+        continue;
+      }
+      await expect(page.getByText(new RegExp(`Week ${week} · Day ${(week - 1) * 7 + day} of 42`))).toBeVisible();
+      const ta = page.locator('main textarea');
+      if (id === 'w6d4' || id === 'w6d5') {
+        await page.locator('label').filter({ hasText: 'Write it down' }).click();
+        await ta.first().fill(id === 'w6d4' ? 'Dear me in six months: you know how to pause. Use it.' : 'Three short sessions a week: Monday, Wednesday, Saturday.', { timeout: 10000 });
+      }
+      if (shotAt[id]) await check(page, shotAt[id]);
+      await page.getByRole('button', { name: 'Complete session' }).click();
+      await expect(page.getByText('Session complete')).toBeVisible();
+    }
+  }
+
+  // Finish: side by side, evidence of change, letter, plan, then maintenance
+  await page.goto('./#/finish');
+  await expect(page.getByText('Day 0').first()).toBeVisible();
+  await check(page, '37-finish-comparison');
+  await page.getByRole('button', { name: 'Start maintenance mode' }).first().click();
+  await page.goto('./#/');
+  await expect(page.getByText(/Maintenance · \d of 3 this week/)).toBeVisible();
+  await check(page, '38-maintenance-today');
+  await page.goto('./#/progress');
+  await expect(page.getByRole('navigation', { name: 'Your six-week journey' }).getByRole('link')).toHaveCount(6);
+  await check(page, '39-progress-journey-map');
+  await page.goto('./#/evidence');
+  await expect(page.getByRole('heading', { level: 1, name: 'Evidence and sources' })).toBeVisible();
+  await check(page, '40-evidence');
+  await page.goto('./#/about');
+  await expect(page.getByRole('heading', { name: 'The six-week path' })).toBeVisible();
+  await check(page, '41-about');
+  await page.goto('./#/phrases');
+  await check(page, '42-phrases');
+
+  const end = await page.evaluate(() => ({ store: JSON.parse(localStorage.getItem('equanim:store') ?? 'null'), legacy: localStorage.getItem('equanim:data') }));
+  expect(end.legacy).toBeNull();
+  expect(end.store.data.sessions).toHaveLength(37);
+  expect(end.store.data.reviews).toHaveLength(6);
+  expect(end.store.data.baselines.map((b: { kind: string }) => b.kind).sort()).toEqual(['finish', 'start']);
+  expect(end.store.data.programme.maintenanceStartedAt).toBeTruthy();
+  SHOTS = process.env.PROG_SHOTS;
 });
 
 test('[SIMULATED phone] taster, then the programme offer for an existing 1.1 user', async ({ page }) => {

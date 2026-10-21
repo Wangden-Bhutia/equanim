@@ -1,10 +1,15 @@
 import type { DomainId } from '../types';
+import { RETRIEVAL_MORE } from './programme/retrieval-more';
+import { WEEK2, WEEK3, WEEK4, WEEK5, WEEK6 } from './programme/weeks';
+export { PHRASE_BANKS, PHRASE_BANK_BY_ID, type PhraseBank } from './programme/phrases';
+export { INTEGRATION, INTEGRATION_BY_ID, type IntegrationScenario } from './programme/integration';
 import { DOMAINS } from './domains';
 
 /**
- * The 6-week programme, as data. The engine (src/engine/programme.ts) works for all six weeks; PR 1 ships the
- * content for Week 0 (Day 0) and Week 1. Sessions marked `available: false` are part of the path but their
- * content arrives in a later update. All wording is Equanim's own.
+ * The 6-week programme, as data. The engine (src/engine/programme.ts) works for all six weeks. Week 0 and Week 1
+ * live here; Weeks 2–6, phrase banks, integration scenarios and the extra retrieval questions live in
+ * src/data/programme/. A session marked `available: false` would be shown as "arrives in a later update".
+ * All wording is Equanim's own.
  */
 
 export type SessionType = 'taster' | 'understand' | 'recognise' | 'rehearse' | 'apply' | 'retrieve' | 'review' | 'integrate' | 'consolidate';
@@ -46,6 +51,14 @@ export interface SessionDef {
   rehearse?: string;
   apply?: { explain: string };
   retrieval?: { questionIds: string[]; scenarioId: string };
+  /** Phrase bank ids (see programme/phrases.ts). */
+  banks?: string[];
+  /** Week 5 mixed situations (see programme/integration.ts). */
+  integration?: string[];
+  /** Show the user's three values with their sentences. */
+  showValues?: boolean;
+  /** Week 6 steps with their own screens or content. */
+  special?: 'baseline-finish' | 'compare' | 'evidence' | 'maintenance';
   prompts?: ReflectPrompt[];
 }
 
@@ -156,7 +169,7 @@ export const REVIEW_PROMPTS: ReflectPrompt[] = [
 // Retrieval questions (Week 1: Freedom from Personalisation)
 // ---------------------------------------------------------------------------------------------
 
-export const RETRIEVAL: RetrievalQuestion[] = [
+const RETRIEVAL_W1: RetrievalQuestion[] = [
   {
     id: 'rq-p-1', domain: 'personalisation', level: 'easy',
     question: 'Your colleague replies "ok." to a long message. Which of these is the observation, not the meaning?',
@@ -218,6 +231,7 @@ export const RETRIEVAL: RetrievalQuestion[] = [
     answerId: 'b',
   },
 ];
+export const RETRIEVAL: RetrievalQuestion[] = [...RETRIEVAL_W1, ...RETRIEVAL_MORE];
 export const RETRIEVAL_BY_ID: Record<string, RetrievalQuestion> = Object.fromEntries(RETRIEVAL.map((q) => [q.id, q]));
 
 // ---------------------------------------------------------------------------------------------
@@ -301,13 +315,7 @@ const week1: SessionDef[] = [
     id: 'w1d3', week: 1, day: 3, type: 'rehearse', domain: 'personalisation', title: 'Words for the moment', minutes: 7, available: true,
     intro: 'When the sting arrives, it helps to have a few words ready. Practise them now, when the stakes are low.',
     notThis: P.notThis,
-    phrases: [
-      'What actually happened here?',
-      'That’s one explanation. What are two others?',
-      'This might be about their day, not about me.',
-      'I can check before I decide what it means.',
-      'It stings. I can feel that and still choose what to do next.',
-    ],
+    banks: ['pb-p-moment'],
     rehearse: 'Pick the phrase that feels most natural. Say it quietly aloud three times, or write it in your own words. Then imagine using it in a situation from this week.',
     prompts: [
       { id: 'phrase', label: 'Which phrase will you keep, in your own words?' },
@@ -334,17 +342,7 @@ const week1: SessionDef[] = [
   },
 ];
 
-/** Placeholder entries for Weeks 2–6: part of the path and the engine, content in a later update. */
-function upcoming(week: number): SessionDef[] {
-  const domain = WEEKS[week - 1]!.domain;
-  return [1, 2, 3, 4, 5, 6].map((day) => {
-    const t = DAY_TYPES[day]!;
-    const type: SessionType = week === 5 && day < 6 ? 'integrate' : week === 6 && day < 6 ? 'consolidate' : t.type;
-    return { id: `w${week}d${day}`, week, day, type, domain, title: t.label, minutes: t.minutes, available: false };
-  });
-}
-
-export const SESSIONS: SessionDef[] = [...week1, ...[2, 3, 4, 5, 6].flatMap(upcoming)];
+export const SESSIONS: SessionDef[] = [...week1, ...WEEK2, ...WEEK3, ...WEEK4, ...WEEK5, ...WEEK6];
 export const SESSION_BY_ID: Record<string, SessionDef> = Object.fromEntries([TASTER, ...SESSIONS].map((s) => [s.id, s]));
 
 /** Day 0 is two steps (values, then baseline); it counts as the first completed session. */

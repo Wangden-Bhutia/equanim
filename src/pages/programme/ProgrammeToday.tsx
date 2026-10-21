@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ArrowRight, Check, ChevronDown, CloudDownload, Moon, NotebookPen, PlayCircle, Sunrise } from 'lucide-react';
+import { ArrowRight, Check, ChevronDown, CloudDownload, MessageCircle, Moon, NotebookPen, PlayCircle, RotateCcw, Sunrise } from 'lucide-react';
 import { useStore } from '../../app/store';
-import { DAY0_ID, DAY_TYPES, DIDNT_MANAGE_RESPONSE, EVENING_QUESTION, INDEPENDENCE_TEXT, OUTCOME_LABELS, RETRIEVAL_BY_ID, SESSION_BY_ID } from '../../data/programme';
+import { PHRASE_BANKS, DAY0_ID, DAY_TYPES, DIDNT_MANAGE_RESPONSE, EVENING_QUESTION, INDEPENDENCE_TEXT, OUTCOME_LABELS, RETRIEVAL_BY_ID, SESSION_BY_ID } from '../../data/programme';
 import { dateKey, formatLongDate, keyFromIso } from '../../engine/dates';
-import { currentSessionId, dueRecall, isReturning, pathProgress, sessionRoute, shouldNudgeBackup, weekDayLabel } from '../../engine/programme';
+import { MAINTENANCE_PER_WEEK, checkinDue, currentSessionId, daysPractisedThisWeek, dueRecall, inMaintenance, isReturning, pathProgress, sessionRoute, shouldNudgeBackup, weekDayLabel } from '../../engine/programme';
+import { SCENARIO_BY_ID } from '../../data/scenarios';
+import { activityDays, suggestScenarioId } from '../../engine/progress';
 import { ChoiceItem, ProgrammeChip } from '../../components/programme';
 import { Dialog } from '../../components/ui';
 import { Confirmation } from '../../components/Confirmation';
@@ -20,16 +22,60 @@ function sessionTitle(id: string) {
   return { title: s.title, meta: `${s.day === 6 ? 'Weekly review' : DAY_TYPES[s.day]?.label ?? ''} · ${s.minutes} min` };
 }
 
-function SessionCard() {
+/** Maintenance: about three short sessions a week from Keep practising, plus a monthly check-in. */
+function maintenanceSuggestion(day: number) {
+  const banks = PHRASE_BANKS;
+  const bank = banks[day % banks.length]!;
+  return { bank };
+}
+
+function MaintenanceCard() {
   const { data } = useStore();
+  const today = dateKey();
+  const n = daysPractisedThisWeek(data, today);
+  const scenarioId = suggestScenarioId(data, null, dayIndex(today));
+  const scenario = SCENARIO_BY_ID[scenarioId];
+  const { bank } = maintenanceSuggestion(dayIndex(today));
+  return (
+    <div className="space-y-4">
+      {checkinDue(data, today) && (
+        <section className="card border-accent/40" aria-labelledby="chk-h">
+          <p className="eyebrow">Monthly check-in</p>
+          <h2 id="chk-h" className="font-serif text-[20px] font-semibold mt-1">The same ten statements, for this month</h2>
+          <p className="text-muted text-[15px] mt-1">About five minutes. You’ll see it next to Day 0 in Progress. Not a test, and not a score.</p>
+          <Link to="/baseline/checkin" className="btn-primary mt-3">Start check-in<ArrowRight size={16} aria-hidden="true" /></Link>
+        </section>
+      )}
+      <section className="card" aria-labelledby="ses-h">
+        <p className="eyebrow">Maintenance · {Math.min(n, MAINTENANCE_PER_WEEK)} of about {MAINTENANCE_PER_WEEK} this week</p>
+        <h2 id="ses-h" className="font-serif text-[22px] font-semibold mt-1">A few minutes of practice</h2>
+        <p className="text-muted text-[15px] mt-1">{n >= MAINTENANCE_PER_WEEK ? 'You have practised three days this week. Anything more is a bonus.' : 'Pick one. Three short sessions a week is plenty to keep the skills in use.'}</p>
+        <ul className="mt-3 space-y-2">
+          {scenario && <li><Link to={`/practise/${scenario.id}`} className="flex items-center gap-3 rounded-xl border border-line px-3 min-h-[48px]"><PlayCircle size={18} className="text-accent" aria-hidden="true" /><span className="flex-1">Scenario: {scenario.title}</span><ArrowRight size={16} aria-hidden="true" /></Link></li>}
+          <li><Link to={`/phrases#${bank.id}`} className="flex items-center gap-3 rounded-xl border border-line px-3 min-h-[48px]"><MessageCircle size={18} className="text-accent" aria-hidden="true" /><span className="flex-1">Phrases: {bank.title}</span><ArrowRight size={16} aria-hidden="true" /></Link></li>
+          <li><Link to="/programme" className="flex items-center gap-3 rounded-xl border border-line px-3 min-h-[48px]"><RotateCcw size={18} className="text-accent" aria-hidden="true" /><span className="flex-1">Repeat a week of the programme</span><ArrowRight size={16} aria-hidden="true" /></Link></li>
+        </ul>
+      </section>
+    </div>
+  );
+}
+
+function SessionCard() {
+  const { data, startMaintenance } = useStore();
   const cur = currentSessionId(data);
   const today = dateKey();
   const doneToday = data.sessions.filter((s) => keyFromIso(s.completedAt) === today && s.sessionId !== 'taster');
+  if (inMaintenance(data)) return <MaintenanceCard />;
   if (cur === null) {
     return (
-      <section className="card" aria-labelledby="ses-h">
-        <h2 id="ses-h" className="font-serif text-[22px] font-semibold">You have finished the programme</h2>
-        <Link to="/finish" className="btn-primary mt-4">Look back<ArrowRight size={16} aria-hidden="true" /></Link>
+      <section className="card completion-moment" aria-labelledby="ses-h">
+        <p className="eyebrow">Six weeks complete</p>
+        <h2 id="ses-h" className="font-serif text-[22px] font-semibold mt-1">You have finished the programme</h2>
+        <p className="text-muted text-[15px] mt-1">Look back at your six weeks side by side, then choose a lighter rhythm to keep the skills in use.</p>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Link to="/finish" className="btn-primary">See your six weeks<ArrowRight size={16} aria-hidden="true" /></Link>
+          <button className="btn-secondary" onClick={startMaintenance}>Start maintenance mode</button>
+        </div>
       </section>
     );
   }
@@ -65,7 +111,7 @@ function StepStrip() {
   const cur = currentSessionId(data);
   const steps = [
     { label: 'Morning plan', done: !!plan, to: '/plan', Icon: Sunrise },
-    { label: 'Session', done: sessionDone, to: cur ? sessionRoute(cur, data) : '/programme', Icon: PlayCircle },
+    { label: inMaintenance(data) ? 'Practice' : 'Session', done: sessionDone || (inMaintenance(data) && activityDays(data).has(today)), to: inMaintenance(data) ? '#ses-h' : cur ? sessionRoute(cur, data) : '/finish', Icon: PlayCircle },
     { label: 'Evening check', done: !!plan?.outcome, to: '#evening-check', Icon: Moon },
   ];
   return (
@@ -178,6 +224,7 @@ export function ProgrammeToday() {
   const now = new Date();
   const today = dateKey(now);
   const cur = currentSessionId(data);
+  const week = daysPractisedThisWeek(data, today);
   const name = data.settings.displayName;
   const intention = data.intentions.find((i) => i.date === today) ?? null;
   const justFinishedDay0 = (loc.state as { completed?: string } | null)?.completed === DAY0_ID;
@@ -187,7 +234,11 @@ export function ProgrammeToday() {
         <p className="eyebrow">{formatLongDate(now)}{name ? ` · ${name}` : ''}</p>
         <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
           <h1 id="today-h" className="text-[28px] leading-tight font-semibold">Today</h1>
-          <Link to="/programme" aria-label={`${weekDayLabel(cur)}. Open the programme`}><ProgrammeChip label={weekDayLabel(cur)} progress={pathProgress(data)} /></Link>
+          {inMaintenance(data) ? (
+            <Link to="/programme" aria-label={`Maintenance: ${Math.min(week, MAINTENANCE_PER_WEEK)} of about ${MAINTENANCE_PER_WEEK} days this week. Open the programme`}><ProgrammeChip label={`Maintenance · ${Math.min(week, MAINTENANCE_PER_WEEK)} of ${MAINTENANCE_PER_WEEK} this week`} progress={Math.min(1, week / MAINTENANCE_PER_WEEK)} /></Link>
+          ) : (
+            <Link to="/programme" aria-label={`${weekDayLabel(cur)}. Open the programme`}><ProgrammeChip label={weekDayLabel(cur)} progress={pathProgress(data)} /></Link>
+          )}
         </div>
         {justFinishedDay0 && <p role="status" className="mt-3 text-[15px]">Day 0 is done. Week 1 starts whenever you are ready.</p>}
         {isReturning(data, today) && <p className="mt-3 text-[15px] rounded-xl bg-accentsoft px-3 py-2">Welcome back. Pick up where you left off: nothing has been lost, and there is no catching up to do.</p>}

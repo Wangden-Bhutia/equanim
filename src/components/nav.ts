@@ -12,7 +12,7 @@ export const SECONDARY_NAV = [
   { to: '/programme', label: 'The 6-week programme', icon: CalendarDays, desc: 'All six weeks, and where you are' },
   { to: '/about', label: 'About Equanim', icon: Info, desc: 'What this app is, and what it is not' },
   { to: '/framework', label: 'Practice Framework', icon: Layers, desc: 'The four domains and how they work together' },
-  { to: '/references', label: 'Reading and References', icon: BookMarked, desc: 'Sources and attribution' },
+  { to: '/evidence', label: 'Evidence and sources', icon: BookMarked, desc: 'The research behind the ideas, and its limits' },
   { to: '/settings', label: 'Settings and Data', icon: Cog, desc: 'Preferences, export, import and reset' },
   { to: '/privacy', label: 'Privacy and Storage', icon: ShieldCheck, desc: 'Where your data lives, and its limits' },
 ];

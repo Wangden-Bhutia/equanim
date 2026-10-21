@@ -17,7 +17,7 @@ const go = (hash: string) => { window.location.hash = hash; };
 const yesterday = () => new Date(Date.now() - 86400000).toISOString();
 const ses = (...ids: string[]) => ids.map((sessionId) => ({ id: `ses_${sessionId}`, sessionId, completedAt: yesterday(), updatedAt: now(), mode: 'think' as const, answers: {}, choices: {} }));
 function enrolled(extra: Partial<AppData> = {}): AppData {
-  return { ...emptyData(), onboardingCompletedAt: now(), programme: { startedAt: now(), disclaimerSeenAt: now() }, ...extra };
+  return { ...emptyData(), onboardingCompletedAt: now(), programme: { startedAt: now(), disclaimerSeenAt: now(), maintenanceStartedAt: null }, ...extra };
 }
 
 beforeEach(() => go('#/'));
@@ -119,7 +119,7 @@ describe('Today and sessions', () => {
 
   it('says "pick up where you left off" after a gap, with no penalty', async () => {
     const old = new Date(Date.now() - 5 * 86400000).toISOString();
-    seed(enrolled({ programme: { startedAt: old, disclaimerSeenAt: old }, sessions: ses('w0d0').map((s) => ({ ...s, completedAt: old })) }));
+    seed(enrolled({ programme: { startedAt: old, disclaimerSeenAt: old, maintenanceStartedAt: null }, sessions: ses('w0d0').map((s) => ({ ...s, completedAt: old })) }));
     render(<App />);
     expect(await screen.findByText(/Pick up where you left off/)).toBeInTheDocument();
     expect(screen.getByText('Week 1 · Day 1 of 42')).toBeInTheDocument();
@@ -155,7 +155,7 @@ describe('habit loop', () => {
     expect(stored().plans[0]).toMatchObject({ domain: 'personalisation', outcome: 'didnt-manage', note: 'Replied too fast' });
   });
 
-  it('weekly review completes Day 6; Today then explains Week 2 arrives in the next update', async () => {
+  it('weekly review completes Day 6; Today then moves on to Week 2', async () => {
     seed(enrolled({ sessions: ses('w0d0', 'w1d1', 'w1d2', 'w1d3', 'w1d4', 'w1d5') }));
     const u = userEvent.setup();
     render(<App />);
@@ -168,7 +168,7 @@ describe('habit loop', () => {
     expect(await screen.findByText('Week 1 review saved')).toBeInTheDocument();
     expect(stored().reviews[0]).toMatchObject({ week: 1, worked: 'Pausing', rating: 4 });
     go('#/');
-    expect(await screen.findByText(/Week 2 arrives in the next update/)).toBeInTheDocument();
+    expect(await screen.findByText('Week 2 · Day 8 of 42')).toBeInTheDocument();
   });
 });
 

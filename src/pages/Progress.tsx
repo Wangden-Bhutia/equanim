@@ -4,6 +4,52 @@ import { DOMAIN_LIST } from '../data/domains';
 import { computeProgress } from '../engine/progress';
 import { formatShort } from '../engine/dates';
 import { EmptyState, LegacyCheckIn, PageHeader } from '../components/ui';
+import { dateKey } from '../engine/dates';
+import { checkinDue, daysPractisedThisWeek, inMaintenance, isReturning, latestSnapshot, weekStatuses } from '../engine/programme';
+import { BaselineCompare, JourneyMap, PlanOutcomes, ValuesList } from '../components/journey';
+import type { AppData } from '../types';
+
+function ProgrammeProgress({ data }: { data: AppData }) {
+  const today = dateKey();
+  const start = data.baselines.find((b) => b.kind === 'start');
+  const snap = latestSnapshot(data);
+  const practised = daysPractisedThisWeek(data, today);
+  const reviews = [...data.reviews].sort((a, b) => a.week - b.week);
+  return (
+    <section aria-labelledby="prog-h" className="space-y-4">
+      <h2 id="prog-h" className="font-serif text-[22px] font-semibold">Your six weeks</h2>
+      <div className="card"><JourneyMap statuses={weekStatuses(data)} /></div>
+      <div className="card">
+        <p className="text-[15px]"><span className="font-semibold">{practised}</span> {practised === 1 ? 'day' : 'days'} practised this week{inMaintenance(data) ? ' · about 3 a week keeps the skills warm' : ''}.</p>
+        {isReturning(data, today) && <p className="text-[14.5px] text-muted mt-1.5">Welcome back. Returning is part of the practice; pick up exactly where you left off.</p>}
+        {checkinDue(data, today) && <Link to="/baseline/checkin" className="btn-secondary mt-3 inline-flex">Take this month’s check-in</Link>}
+      </div>
+      {start && (
+        <div className="card">
+          <h3 className="eyebrow mb-2">Day 0 and now</h3>
+          {snap ? <BaselineCompare start={start} now={snap} nowLabel={snap.kind === 'finish' ? 'Week 6' : 'Check-in'} />
+            : <p className="text-[14.5px] text-muted">Your Day 0 snapshot is saved. You will see it side by side with Week 6.</p>}
+        </div>
+      )}
+      {reviews.length > 0 && (
+        <div className="card">
+          <h3 className="eyebrow mb-2">Weekly notes</h3>
+          <ol className="border-l-2 border-line pl-4 space-y-3">
+            {reviews.map((r) => (
+              <li key={r.id}>
+                <p className="text-[13px] text-muted">Week {r.week} · {formatShort(r.completedAt)}</p>
+                {r.worked && <p className="text-[15px]"><span className="font-medium">Worked: </span>{r.worked}</p>}
+                {r.noticed && <p className="text-[15px]"><span className="font-medium">Noticed: </span>{r.noticed}</p>}
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+      <div className="card"><h3 className="eyebrow mb-2">Plans and outcomes</h3><PlanOutcomes data={data} /></div>
+      <ValuesList data={data} />
+    </section>
+  );
+}
 
 function Stat({ value, label, hint }: { value: number | string; label: string; hint?: string }) {
   return (
@@ -32,6 +78,8 @@ export function Progress() {
   return (
     <div className="space-y-7">
       <PageHeader title="Progress" intro="A record of practice, not a score. Nothing here rates your choices or your character, and a missed day takes nothing away." />
+
+      {data.programme && <ProgrammeProgress data={data} />}
 
       <section aria-labelledby="days-h" className="card">
         <h2 id="days-h" className="eyebrow">Days engaged</h2>

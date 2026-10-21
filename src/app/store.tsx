@@ -60,8 +60,9 @@ interface StoreValue {
   // 6-week programme
   startProgramme: () => void;
   markDisclaimerSeen: () => void;
+  startMaintenance: () => void;
   saveValues: (choices: { id: string; sentence: string }[]) => void;
-  saveBaseline: (kind: 'start' | 'finish', ratings: Record<string, number>, situations: string[]) => void;
+  saveBaseline: (kind: 'start' | 'finish' | 'checkin', ratings: Record<string, number>, situations: string[]) => void;
   completeSession: (sessionId: string, mode: SessionMode, answers: Record<string, string>, choices?: Record<string, string>) => void;
   saveReview: (week: number, review: { worked: string; gotInWay: string; noticed: string; rating: number | null }) => void;
   savePlan: (plan: { when: string; then: string; domain: DomainId | null }) => void;
@@ -346,7 +347,11 @@ export function StoreProvider({ children, adapter, locks, channel }: {
 
     startProgramme: () => {
       const t = now();
-      update((d) => (d.programme ? d : { ...d, programme: { startedAt: t, disclaimerSeenAt: null } }));
+      update((d) => (d.programme ? d : { ...d, programme: { startedAt: t, disclaimerSeenAt: null, maintenanceStartedAt: null } }));
+    },
+    startMaintenance: () => {
+      const t = now();
+      update((d) => ({ ...d, programme: { startedAt: d.programme?.startedAt ?? t, disclaimerSeenAt: d.programme?.disclaimerSeenAt ?? t, maintenanceStartedAt: d.programme?.maintenanceStartedAt ?? t } }));
     },
     markDisclaimerSeen: () => {
       const t = now();
@@ -365,12 +370,14 @@ export function StoreProvider({ children, adapter, locks, channel }: {
     },
     saveBaseline: (kind, ratings, situations) => {
       const t = now();
-      const id = `bl_${kind}`;
+      const id = kind === 'checkin' ? `bl_checkin_${dateKey().slice(0, 7)}` : `bl_${kind}`;
       update((d) => {
         const prev = d.baselines.find((b) => b.id === id);
         const rec = { id, kind, ratings, situations: situations.map((x) => x.trim()), completedAt: prev?.completedAt ?? t, updatedAt: t };
         const next = { ...d, baselines: prev ? d.baselines.map((b) => (b.id === id ? rec : b)) : [...d.baselines, rec] };
-        return kind === 'start' ? withSession(next, DAY0_ID, 'write', {}, {}, t) : next;
+        if (kind === 'start') return withSession(next, DAY0_ID, 'write', {}, {}, t);
+        if (kind === 'finish') return withSession(next, 'w6d1', 'write', {}, {}, t);
+        return next;
       });
     },
     completeSession: (sessionId, mode, answers, choices = {}) => {

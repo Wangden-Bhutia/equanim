@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, Navigate, useParams } from 'react-router-dom';
 import { ArrowRight, Check, Lock } from 'lucide-react';
 import { useStore } from '../../app/store';
-import { DAY_TYPES, RETRIEVAL_BY_ID, SESSION_BY_ID, type SessionDef } from '../../data/programme';
+import { DAY_TYPES, INTEGRATION_BY_ID, RETRIEVAL_BY_ID, SESSION_BY_ID, type SessionDef } from '../../data/programme';
+import { DOMAINS } from '../../data/domains';
+import { BaselineCompare, EvidenceOfChange, PhraseBankCard, ValuesList } from '../../components/journey';
 import { SCENARIO_BY_ID } from '../../data/scenarios';
-import { currentSessionId, isDone, isUnlocked, sessionRoute, weekDayLabel } from '../../engine/programme';
+import { currentSessionId, isDone, isUnlocked, latestSnapshot, sessionRoute, weekDayLabel } from '../../engine/programme';
 import { ChoiceItem, ModeToggle } from '../../components/programme';
 import { DomainTag, PageHeader } from '../../components/ui';
 import { Confirmation } from '../../components/Confirmation';
@@ -35,6 +37,7 @@ export function Session() {
   const [justDone, setJustDone] = useState(false);
   const [doneAtStart] = useState(!!prev);
   if (!s) return <NotFound />;
+  if (s.special === 'baseline-finish') return <Navigate to="/baseline/finish" replace />;
   const onboarded = !!data.onboardingCompletedAt;
   const isTaster = s.type === 'taster';
   const eyebrow = isTaster ? 'Two-minute taster' : `${weekDayLabel(s.id)} · ${typeLabel(s)} · ${s.minutes} min`;
@@ -92,12 +95,30 @@ export function Session() {
         <ChoiceItem key={r.id} id={r.id} situation={r.situation} question={r.question} options={r.options} answerId={r.answerId}
           initial={choices[r.id]} onChoose={(o) => setChoices((c) => ({ ...c, [r.id]: o }))} />
       ))}
-      {s.phrases && (
-        <Block title="Phrases to try">
-          <ul className="space-y-2">{s.phrases.map((p) => <li key={p} className="rounded-xl border border-line px-3 py-2 text-[15.5px] font-serif">“{p}”</li>)}</ul>
-          {s.rehearse && <p className="mt-3 text-[15px]">{s.rehearse}</p>}
+      {s.showValues && <ValuesList data={data} title="Your values, from Day 0" />}
+      {s.special === 'compare' && (
+        <Block title="Day 0 and now">
+          <BaselineCompare start={data.baselines.find((b) => b.kind === 'start')} now={latestSnapshot(data)} nowLabel="Week 6" />
         </Block>
       )}
+      {s.special === 'evidence' && <Block title="From your own notes"><EvidenceOfChange data={data} /></Block>}
+      {s.special === 'maintenance' && (
+        <Block title="What maintenance looks like">
+          <p className="text-[15.5px]">After Week 6, Today switches to a lighter rhythm: about three short sessions a week from Keep practising, a monthly check-in with the same statements, and the option to repeat any week whenever you like.</p>
+        </Block>
+      )}
+      {s.banks && s.banks.map((b) => <PhraseBankCard key={b} id={b} />)}
+      {s.banks && s.rehearse && <p className="text-[15px]">{s.rehearse}</p>}
+      {s.integration?.map((xid) => {
+        const x = INTEGRATION_BY_ID[xid];
+        return x ? (
+          <div key={x.id}>
+            <p className="text-[12px] text-muted mb-1.5">Skills: {x.domains.map((d) => DOMAINS[d].name).join(' · ')}</p>
+            <ChoiceItem id={x.id} situation={x.situation} question={x.question} options={x.options} answerId={x.answerId}
+              initial={choices[x.id]} onChoose={(o) => setChoices((c) => ({ ...c, [x.id]: o }))} />
+          </div>
+        ) : null;
+      })}
       {s.apply && (
         <Block title="Make it concrete">
           <p className="text-[15.5px]">{s.apply.explain}</p>
@@ -129,7 +150,7 @@ export function Session() {
       )}
 
       {done ? (
-        <div className="card">
+        <div className={`card ${justDone ? 'completion-moment' : ''}`}>
           <Confirmation focus={justDone} className="flex items-center gap-2 font-medium text-accent"><Check size={18} aria-hidden="true" />{doneAtStart && !justDone ? 'Completed. You can revisit it any time.' : 'Session complete'}</Confirmation>
           {justDone && !doneAtStart && !isTaster && <p className="text-muted text-[15px] mt-2">Nice work. The next session opens now, whenever you are ready: today, tomorrow or later.</p>}
           {doneAtStart && justDone && <p className="text-muted text-[15px] mt-2">Your changes were saved.</p>}
@@ -137,6 +158,7 @@ export function Session() {
             {isTaster && !onboarded ? <Link to="/welcome" className="btn-primary">Back to the welcome<ArrowRight size={16} aria-hidden="true" /></Link>
               : <Link to="/" className="btn-primary">Back to Today<ArrowRight size={16} aria-hidden="true" /></Link>}
             {s.apply && <Link to="/plan" className="btn-secondary">Make today’s plan</Link>}
+            {s.id === 'w6d5' && justDone && <Link to="/finish" className="btn-secondary">See your six weeks</Link>}
             {doneAtStart && !justDone && <button className="btn-ghost" onClick={finish}>Save changes</button>}
           </div>
         </div>

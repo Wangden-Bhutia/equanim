@@ -33,10 +33,12 @@
   --clay: 142 79 56;            /* #8E4F38 derived: terracotta for small text */
   --clay-soft: 242 228 219;     /* #F2E4DB derived terracotta tint */
   --danger: 150 52 40;          /* #963428 derived from terracotta, for destructive actions */
+  /* Per-skill accents. Used for text and marks, so each has at least 4.5:1 contrast on bg and surface
+     (checked in tests/unit/colours.test.ts). */
   --d-speech: 41 72 58;         /* forest */
-  --d-personalisation: 185 111 85; /* terracotta */
-  --d-inquiry: 167 181 160;     /* sage */
-  --d-effort: 92 97 90;         /* charcoal, muted */
+  --d-personalisation: 142 79 56; /* clay */
+  --d-inquiry: 46 88 110;       /* slate blue */
+  --d-effort: 116 84 22;        /* ochre */
   color-scheme: light;
 }
 
@@ -56,9 +58,9 @@
   --clay-soft: 62 46 39;
   --danger: 240 150 130;
   --d-speech: 169 199 180;
-  --d-personalisation: 216 154 128;
-  --d-inquiry: 167 181 160;
-  --d-effort: 179 184 174;
+  --d-personalisation: 227 173 150;
+  --d-inquiry: 150 196 214;
+  --d-effort: 220 188 120;
   color-scheme: dark;
 }
 
@@ -103,3 +105,9 @@ label:has(> input.sr-only:focus-visible) { outline: 2px solid rgb(var(--accent))
 /* Text fields keep a clear focus indicator in addition to the border colour change. */
 .field:focus-visible { box-shadow: 0 0 0 3px rgb(var(--accent) / 0.35); }
 input[type="time"].field:focus, input[type="time"].field:focus-within, input[type="time"].field:has(:focus) { box-shadow: 0 0 0 3px rgb(var(--accent) / 0.35); }
+
+/* Quiet completion moment: a short fade and lift, only when the user has not asked for reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .completion-moment { animation: eq-settle 600ms ease-out both; }
+  @keyframes eq-settle { from { opacity: 0; transform: translateY(6px) scale(0.98); } to { opacity: 1; transform: none; } }
+}

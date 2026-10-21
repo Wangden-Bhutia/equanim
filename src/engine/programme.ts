@@ -58,6 +58,7 @@ export function sessionRoute(sessionId: string, d?: AppData): string {
   if (sessionId === DAY0_ID) return d && d.values.length >= 3 ? '/baseline' : '/values';
   const p = parseSessionId(sessionId);
   if (p && p.day === 6) return `/review/${p.week}`;
+  if (sessionId === 'w6d1') return '/baseline/finish';
   return `/session/${sessionId}`;
 }
 
@@ -147,4 +148,49 @@ export function shouldNudgeBackup(d: AppData): boolean {
   if (usageDaysAfter(d, lastExport) < NUDGE_EVERY_DAYS) return false;
   const dismissed = d.settings.backupNudgeDismissedOn;
   return dismissed === null || usageDaysAfter(d, dismissed) >= NUDGE_EVERY_DAYS;
+}
+
+// ---------- Progress views ----------
+
+/** Monday of the week containing `today` (a date key). */
+export function weekStart(today: string): string {
+  const [y, m, d] = today.split('-').map(Number);
+  const dow = (new Date(y!, m! - 1, d!).getDay() + 6) % 7; // Monday = 0
+  return addDays(today, -dow);
+}
+
+/** Days with any recorded practice since Monday, including today. */
+export function daysPractisedThisWeek(d: AppData, today: string): number {
+  const start = weekStart(today);
+  return [...activityDays(d)].filter((k) => k >= start && k <= today).length;
+}
+
+/** Status of each of the six weeks for the journey map. */
+export type WeekStatus = 'done' | 'current' | 'upcoming';
+export function weekStatuses(d: AppData): WeekStatus[] {
+  const cur = currentSessionId(d);
+  const curWeek = cur === null ? 7 : Math.max(1, parseSessionId(cur)?.week ?? 1);
+  return [1, 2, 3, 4, 5, 6].map((w) => (w < curWeek ? 'done' : w === curWeek ? 'current' : 'upcoming'));
+}
+
+/** The most recent "now" snapshot: the Week 6 baseline or a later monthly check-in. Null if none. */
+export function latestSnapshot(d: AppData) {
+  return [...d.baselines].filter((b) => b.kind !== 'start').sort((a, b) => a.completedAt.localeCompare(b.completedAt)).pop() ?? null;
+}
+
+// ---------- Maintenance mode ----------
+
+export const MAINTENANCE_PER_WEEK = 3;
+export const inMaintenance = (d: AppData) => !!d.programme?.maintenanceStartedAt;
+
+/** A monthly check-in is due when no snapshot (Week 6 or check-in) exists for the current month. */
+export function checkinDue(d: AppData, today: string): boolean {
+  if (!inMaintenance(d)) return false;
+  const month = today.slice(0, 7);
+  return !d.baselines.some((b) => b.kind !== 'start' && keyFromIso(b.completedAt).slice(0, 7) === month);
+}
+
+/** Week ids that can be restarted in maintenance: every week whose sessions are available. */
+export function restartTarget(week: number): string {
+  return `w${week}d1`;
 }

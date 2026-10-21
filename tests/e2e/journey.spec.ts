@@ -148,7 +148,7 @@ test('[SIMULATED phone: Pixel 7 profile in Chromium, not a real device] welcome,
     ['#/more', 'More', '25-more'],
     ['#/about', 'About Equanim', '26-about'],
     ['#/framework', 'Practice Framework', '27-framework'],
-    ['#/references', 'Reading and References', '28-references'],
+    ['#/evidence', 'Evidence and sources', '28-evidence'],
     ['#/settings', 'Settings and Data', '29-settings'],
     ['#/privacy', 'Privacy and Storage', '30-privacy'],
   ] as const;
@@ -165,7 +165,7 @@ test('[SIMULATED phone: Pixel 7 profile in Chromium, not a real device] welcome,
   const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: /export backup/i }).click()]);
   const json = JSON.parse(fs.readFileSync((await download.path())!, 'utf8'));
   expect(json.app).toBe('equanim');
-  expect(json.data.schemaVersion).toBe(3);
+  expect(json.data.schemaVersion).toBe(4);
   expect(json.data.journal).toHaveLength(3);
   expect(json.data.reflections).toHaveLength(1);
 
@@ -237,7 +237,7 @@ test('desktop sidebar, and the app makes no third-party requests', async ({ page
   await expect(page.getByText('Morning intention')).toBeVisible();
   const sidebar = page.getByRole('complementary', { name: 'Sidebar' });
   await expect(sidebar).toBeVisible();
-  for (const name of ['Today', 'Journal', 'Library', 'Progress', 'The 6-week programme', 'About Equanim', 'Practice Framework', 'Reading and References', 'Settings and Data', 'Privacy and Storage']) {
+  for (const name of ['Today', 'Journal', 'Library', 'Progress', 'The 6-week programme', 'About Equanim', 'Practice Framework', 'Evidence and sources', 'Settings and Data', 'Privacy and Storage']) {
     await expect(sidebar.getByRole('link', { name, exact: true })).toBeVisible();
   }
   await axe(page);
