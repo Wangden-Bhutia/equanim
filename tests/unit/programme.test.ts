@@ -5,7 +5,7 @@ import {
   reminderIcs, sessionRoute, shouldNudgeBackup, weekDayLabel,
 } from '../../src/engine/programme';
 import {
-  BASELINE_ITEMS, DAY0_ID, PLAN_CHIPS, RETRIEVAL, RETRIEVAL_BY_ID, SESSIONS, TASTER, VALUES, WEEKS,
+  BASELINE_ITEMS, DAY0_ID, INTEGRATION, INTEGRATION_BY_ID, PHRASE_BANKS, PHRASE_BANK_BY_ID, PLAN_CHIPS, RETRIEVAL, RETRIEVAL_BY_ID, SESSIONS, SESSION_BY_ID, TASTER, VALUES, WEEKS,
 } from '../../src/data/programme';
 import { SCENARIO_BY_ID } from '../../src/data/scenarios';
 import { DOMAIN_IDS, type AppData } from '../../src/types';
@@ -120,44 +120,74 @@ describe('backup nudge', () => {
   });
 });
 
-describe('content completeness (Week 0 and Week 1)', () => {
-  const available = [TASTER, ...SESSIONS.filter((s) => s.available)];
-  it('ships Week 1 in full, and keeps Weeks 2–6 on the path for the next update', () => {
-    expect(SESSIONS.filter((s) => s.week === 1).every((s) => s.available)).toBe(true);
-    expect(SESSIONS.filter((s) => s.week > 1).every((s) => !s.available)).toBe(true);
+describe('content completeness (whole programme)', () => {
+  const available = [TASTER, ...SESSIONS];
+  it('ships all six weeks: six sessions each, every one available, one skill per week for Weeks 1–4', () => {
+    expect(SESSIONS).toHaveLength(36);
+    expect(SESSIONS.every((s) => s.available)).toBe(true);
+    for (const w of [1, 2, 3, 4, 5, 6]) expect(SESSIONS.filter((s) => s.week === w).map((s) => s.day)).toEqual([1, 2, 3, 4, 5, 6]);
     expect(WEEKS.map((w) => w.domain)).toEqual(['personalisation', 'inquiry', 'speech', 'effort', null, null]);
+    for (const w of WEEKS.slice(0, 4)) expect(SESSIONS.filter((s) => s.week === w.week).every((s) => s.domain === w.domain)).toBe(true);
   });
-  it('every available session has a title, a time estimate and an intro; every lesson has a body, an example and a not-this caveat', () => {
+  it('every session has a title, a time estimate of 1–15 minutes and an intro; every non-review session has a not-this caveat; every lesson has a body and an example', () => {
     for (const s of available) {
       expect(s.title.length, s.id).toBeGreaterThan(3);
       expect(s.minutes, s.id).toBeGreaterThanOrEqual(1);
       expect(s.minutes, s.id).toBeLessThanOrEqual(15);
       expect(s.intro, s.id).toBeTruthy();
       if (s.type !== 'review') expect(s.notThis, s.id).toBeTruthy();
-      if (s.type === 'understand' || s.type === 'taster') {
-        expect(s.lesson?.body.length, s.id).toBeGreaterThan(1);
-        expect(s.lesson?.example, s.id).toBeTruthy();
-      }
+      if (s.lesson) { expect(s.lesson.body.length, s.id).toBeGreaterThan(1); expect(s.lesson.example, s.id).toBeTruthy(); }
+      if (s.type === 'understand' || s.type === 'taster') expect(s.lesson, s.id).toBeTruthy();
     }
   });
-  it('each day type has what it needs', () => {
-    const w1 = Object.fromEntries(SESSIONS.filter((s) => s.week === 1).map((s) => [s.type, s]));
-    expect(w1.recognise!.recognise).toHaveLength(3);
-    expect(w1.rehearse!.phrases!.length).toBeGreaterThanOrEqual(3);
-    expect(w1.apply!.apply).toBeTruthy();
-    expect(w1.retrieve!.retrieval!.questionIds).toHaveLength(3);
-    expect(SCENARIO_BY_ID[w1.retrieve!.retrieval!.scenarioId]).toBeTruthy();
-    for (const id of w1.retrieve!.retrieval!.questionIds) expect(RETRIEVAL_BY_ID[id]).toBeTruthy();
+  it('each day type in Weeks 1–4 has what it needs; Day 5 asks 3 questions from the week (+1 earlier from Week 2) and a harder scenario', () => {
+    for (const w of [1, 2, 3, 4]) {
+      const by = Object.fromEntries(SESSIONS.filter((s) => s.week === w).map((s) => [s.type, s]));
+      const domain = WEEKS[w - 1]!.domain;
+      expect(by.recognise!.recognise, `w${w}`).toHaveLength(3);
+      expect(by.rehearse!.banks!.length, `w${w}`).toBeGreaterThanOrEqual(1);
+      for (const b of by.rehearse!.banks!) expect(PHRASE_BANK_BY_ID[b]!.domain).toBe(domain);
+      expect(by.apply!.apply, `w${w}`).toBeTruthy();
+      const qs = by.retrieve!.retrieval!.questionIds.map((id) => RETRIEVAL_BY_ID[id]!);
+      expect(qs.filter((q) => q.domain === domain), `w${w}`).toHaveLength(3);
+      expect(qs.length, `w${w}`).toBe(w === 1 ? 3 : 4);
+      expect(SCENARIO_BY_ID[by.retrieve!.retrieval!.scenarioId], `w${w}`).toBeTruthy();
+    }
   });
-  it('recognise items and retrieval questions have feedback for every option, including an explanation for each wrong answer', () => {
-    const items = [...SESSIONS.flatMap((s) => s.recognise ?? []), ...RETRIEVAL];
+  it('Week 5 uses all 12 integration scenarios once, plans the hardest situation with the user’s values; Week 6 repeats the baseline, compares, gathers evidence, writes a letter and a maintenance plan', () => {
+    const used = SESSIONS.filter((s) => s.week === 5).flatMap((s) => s.integration ?? []);
+    expect(used.sort()).toEqual(INTEGRATION.map((x) => x.id).sort());
+    expect(INTEGRATION).toHaveLength(12);
+    for (const x of INTEGRATION) expect(x.domains.length, x.id).toBeGreaterThanOrEqual(2);
+    const w5d4 = SESSION_BY_ID.w5d4!;
+    expect(w5d4.showValues).toBe(true);
+    expect(w5d4.prompts!.length).toBeGreaterThanOrEqual(4);
+    expect(['w6d1', 'w6d2', 'w6d3', 'w6d5'].map((id) => SESSION_BY_ID[id]!.special)).toEqual(['baseline-finish', 'compare', 'evidence', 'maintenance']);
+    expect(SESSION_BY_ID.w6d4!.prompts![0]!.id).toBe('letter');
+    expect(sessionRoute('w6d1')).toBe('/baseline/finish');
+  });
+  it('has 16 retrieval questions per skill, with easy, medium and hard in each, and unique ids', () => {
+    expect(new Set(RETRIEVAL.map((q) => q.id)).size).toBe(RETRIEVAL.length);
+    for (const d of DOMAIN_IDS) {
+      const qs = RETRIEVAL.filter((q) => q.domain === d);
+      expect(qs, d).toHaveLength(16);
+      for (const level of ['easy', 'medium', 'hard'] as const) expect(qs.filter((q) => q.level === level).length, `${d} ${level}`).toBeGreaterThanOrEqual(4);
+    }
+  });
+  it('recognise items, retrieval questions and integration scenarios have feedback for every option, including an explanation for each wrong answer', () => {
+    const items = [...SESSIONS.flatMap((s) => s.recognise ?? []), ...RETRIEVAL, ...INTEGRATION];
     for (const q of items) {
       expect(q.options.length, q.id).toBeGreaterThanOrEqual(3);
       expect(q.options.map((o) => o.id), q.id).toContain(q.answerId);
       for (const o of q.options) expect(o.feedback.length, `${q.id}/${o.id}`).toBeGreaterThan(12);
     }
-    const levels = new Set(RETRIEVAL.map((q) => q.level));
-    expect([...levels].sort()).toEqual(['easy', 'hard', 'medium']);
+  });
+  it('has 12 phrase banks, three per skill, with unique ids and every referenced bank existing', () => {
+    expect(PHRASE_BANKS).toHaveLength(12);
+    for (const d of DOMAIN_IDS) expect(PHRASE_BANKS.filter((b) => b.domain === d), d).toHaveLength(3);
+    for (const b of PHRASE_BANKS) expect(b.phrases.length, b.id).toBeGreaterThanOrEqual(4);
+    for (const s of SESSIONS) for (const b of s.banks ?? []) expect(PHRASE_BANK_BY_ID[b], `${s.id}:${b}`).toBeTruthy();
+    for (const s of SESSIONS) for (const x of s.integration ?? []) expect(INTEGRATION_BY_ID[x], `${s.id}:${x}`).toBeTruthy();
   });
   it('Day 0 has 12 values and 8–10 baseline items covering all four skills; every domain has plan chips and a suggested plan', () => {
     expect(VALUES).toHaveLength(12);
@@ -170,10 +200,11 @@ describe('content completeness (Week 0 and Week 1)', () => {
       expect(PLAN_CHIPS[d].suggested.when).toBeTruthy();
     }
   });
-  it('never quotes the source book and never shames', () => {
-    const text = JSON.stringify({ SESSIONS, RETRIEVAL, TASTER }).toLowerCase();
-    for (const banned of ['be impeccable', 'don\'t take anything personally', 'don\'t make assumptions', 'always do your best', 'failure', 'you failed', 'lazy']) {
+  it('never quotes the source book, never shames, and points to help where safety may be involved', () => {
+    const text = JSON.stringify({ SESSIONS, RETRIEVAL, TASTER, INTEGRATION, PHRASE_BANKS }).toLowerCase();
+    for (const banned of ['be impeccable', 'don\'t take anything personally', 'don\'t make assumptions', 'always do your best', 'impeccable with your word', 'failure', 'you failed', 'lazy', 'pathetic']) {
       expect(text, banned).not.toContain(banned);
     }
+    expect(SESSION_BY_ID.w5d4!.notThis).toMatch(/14416/);
   });
 });
