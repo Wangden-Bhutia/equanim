@@ -37,12 +37,19 @@ export function Library() {
         </div>
         <ChevronRight size={20} className="text-muted shrink-0" aria-hidden="true" />
       </Link>
+      <Link to="/phrases" className="card !p-4 flex items-center gap-3 hover:bg-surface2 transition-colors -mt-5 mb-8">
+        <div className="flex-1 min-w-0">
+          <p className="font-serif text-[18px] font-semibold">Phrase banks</p>
+          <p className="text-sm text-muted">Twelve sets of short words for common moments, three for each skill.</p>
+        </div>
+        <ChevronRight size={20} className="text-muted shrink-0" aria-hidden="true" />
+      </Link>
       <h2 className="eyebrow mb-3">The four domains</h2>
       <ul className="space-y-3 mb-8">{LIBRARY.filter((i) => i.kind === 'section').map((i) => <Row key={i.id} item={i} read={read.has(i.id)} />)}</ul>
       <h2 className="eyebrow mb-3">Essays</h2>
       <ul className="space-y-3 mb-8">{LIBRARY.filter((i) => i.kind === 'essay').map((i) => <Row key={i.id} item={i} read={read.has(i.id)} />)}</ul>
       <div className="card !p-4 text-sm text-muted">
-        How the parts fit together: <Link to="/framework" className="text-accent underline underline-offset-2">Practice Framework</Link>. Sources and attribution: <Link to="/references" className="text-accent underline underline-offset-2">Reading and References</Link>.
+        How the parts fit together: <Link to="/framework" className="text-accent underline underline-offset-2">Practice Framework</Link>. Research and attribution: <Link to="/evidence" className="text-accent underline underline-offset-2">Evidence and sources</Link>.
       </div>
     </div>
   );

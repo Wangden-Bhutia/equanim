@@ -48,7 +48,7 @@ describe('navigation', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Practice scenarios' })).toBeInTheDocument();
     await u.click(within(nav).getByRole('link', { name: 'Today' }));
     expect(await screen.findByText('Morning intention')).toBeInTheDocument();
-    for (const name of ['The 6-week programme', 'About Equanim', 'Practice Framework', 'Reading and References', 'Settings and Data', 'Privacy and Storage']) {
+    for (const name of ['The 6-week programme', 'About Equanim', 'Practice Framework', 'Evidence and sources', 'Settings and Data', 'Privacy and Storage']) {
       await u.click(screen.getByRole('link', { name: /^More:/ }));
       const list = await screen.findByRole('heading', { level: 1, name: 'More' });
       expect(list).toBeInTheDocument();

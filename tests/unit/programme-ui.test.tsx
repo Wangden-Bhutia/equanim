@@ -155,7 +155,7 @@ describe('habit loop', () => {
     expect(stored().plans[0]).toMatchObject({ domain: 'personalisation', outcome: 'didnt-manage', note: 'Replied too fast' });
   });
 
-  it('weekly review completes Day 6; Today then explains Week 2 arrives in the next update', async () => {
+  it('weekly review completes Day 6; Today then moves on to Week 2', async () => {
     seed(enrolled({ sessions: ses('w0d0', 'w1d1', 'w1d2', 'w1d3', 'w1d4', 'w1d5') }));
     const u = userEvent.setup();
     render(<App />);
@@ -168,7 +168,7 @@ describe('habit loop', () => {
     expect(await screen.findByText('Week 1 review saved')).toBeInTheDocument();
     expect(stored().reviews[0]).toMatchObject({ week: 1, worked: 'Pausing', rating: 4 });
     go('#/');
-    expect(await screen.findByText(/Week 2 arrives in the next update/)).toBeInTheDocument();
+    expect(await screen.findByText('Week 2 · Day 8 of 42')).toBeInTheDocument();
   });
 });
 

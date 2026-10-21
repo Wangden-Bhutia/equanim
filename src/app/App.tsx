@@ -18,7 +18,9 @@ import { ScenarioPlayer } from '../pages/ScenarioPlayer';
 import { JournalEditor, JournalList, JournalView } from '../pages/Journal';
 import { Library, LibraryDetail } from '../pages/Library';
 import { Progress } from '../pages/Progress';
-import { About, Framework, More, Privacy, References } from '../pages/Pages';
+import { About, Framework, More, Privacy } from '../pages/Pages';
+import { Evidence } from '../pages/Evidence';
+import { Phrases } from '../pages/Phrases';
 import { Settings } from '../pages/Settings';
 import { NotFound } from '../pages/NotFound';
 
@@ -27,7 +29,7 @@ function Gate() {
   const loc = useLocation();
   const onboarded = !!data.onboardingCompletedAt;
   // Information pages stay reachable before onboarding (e.g. Privacy linked from outside).
-  const openPaths = ['/about', '/privacy', '/references', '/framework', '/session/taster'];
+  const openPaths = ['/about', '/privacy', '/references', '/evidence', '/framework', '/session/taster'];
   if (!onboarded && loc.pathname !== '/welcome' && !openPaths.includes(loc.pathname)) return <Navigate to="/welcome" replace />;
   return (
     <Routes>
@@ -48,13 +50,16 @@ function Gate() {
         <Route path="session/:id" element={<Session />} />
         <Route path="values" element={<Values />} />
         <Route path="baseline" element={<Baseline />} />
+        <Route path="baseline/:kind" element={<Baseline />} />
         <Route path="review/:week" element={<Review />} />
         <Route path="plan" element={<Plan />} />
         <Route path="finish" element={<Finish />} />
         <Route path="more" element={<More />} />
         <Route path="about" element={<About />} />
         <Route path="framework" element={<Framework />} />
-        <Route path="references" element={<References />} />
+        <Route path="references" element={<Navigate to="/evidence" replace />} />
+        <Route path="evidence" element={<Evidence />} />
+        <Route path="phrases" element={<Phrases />} />
         <Route path="privacy" element={<Privacy />} />
         <Route path="settings" element={<Settings />} />
         <Route path="*" element={<NotFound />} />
