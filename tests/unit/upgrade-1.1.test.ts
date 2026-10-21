@@ -56,7 +56,8 @@ describe('1.1 → 1.2 upgrade', () => {
     const r = await new Repository(a, { locks: null }).open();
     expect(r.issue).toBeNull();
     expect(r.data.schemaVersion).toBe(SCHEMA_VERSION);
-    const { schemaVersion: _v, ...rest11 } = data11;
+    const rest11: Record<string, unknown> = { ...data11 };
+    delete rest11.schemaVersion;
     expect(strip(r.data)).toEqual(rest11);
     expect(r.data.settings).toEqual({ ...data11.settings, lastExportAt: null, backupNudgeDismissedOn: null, reminderTime: null });
     expect(r.data.programme).toBeNull(); // existing users are offered the programme, never enrolled automatically
@@ -124,7 +125,8 @@ describe('1.1 → 1.2 upgrade', () => {
     const parsed = parseImport(JSON.stringify({ app: 'equanim', exportedAt: T(10), data: data11 }));
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
-    const { schemaVersion: _v, ...rest11 } = data11;
+    const rest11: Record<string, unknown> = { ...data11 };
+    delete rest11.schemaVersion;
     expect(strip(parsed.data)).toEqual(rest11);
     // and a 1.2 export round-trips
     const again = parseImport(exportJson(parsed.data));
