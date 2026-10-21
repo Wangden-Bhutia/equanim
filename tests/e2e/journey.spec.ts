@@ -165,7 +165,7 @@ test('[SIMULATED phone: Pixel 7 profile in Chromium, not a real device] welcome,
   const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: /export backup/i }).click()]);
   const json = JSON.parse(fs.readFileSync((await download.path())!, 'utf8'));
   expect(json.app).toBe('equanim');
-  expect(json.data.schemaVersion).toBe(3);
+  expect(json.data.schemaVersion).toBe(4);
   expect(json.data.journal).toHaveLength(3);
   expect(json.data.reflections).toHaveLength(1);
 
