@@ -114,6 +114,8 @@ export interface ProgrammeState {
   startedAt: string;
   /** Set once the short independence and safety screen has been shown after the first completed session. */
   disclaimerSeenAt: string | null;
+  /** Schema v4: set when the user moves on to maintenance mode after Week 6 (or chooses it early). */
+  maintenanceStartedAt: string | null;
 }
 
 export type SessionMode = 'think' | 'write';
@@ -138,10 +140,10 @@ export interface ValueChoice {
   updatedAt: string;
 }
 
-/** Self-ratings. Kind 'start' is Day 0; 'finish' is Week 6 (PR 2). Not a validated instrument. */
+/** Self-ratings. 'start' is Day 0; 'finish' is Week 6; 'checkin' is a monthly maintenance check-in (id bl_checkin_YYYY-MM). Not a validated instrument. */
 export interface Baseline {
   id: string;
-  kind: 'start' | 'finish';
+  kind: 'start' | 'finish' | 'checkin';
   ratings: Record<string, number>;
   situations: string[];
   completedAt: string;

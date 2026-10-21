@@ -1,6 +1,6 @@
 import { DOMAIN_IDS, type AppData, type DomainId } from '../types';
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 export const MAX_TEXT = 20000;
 
 export function emptyData(now: Date = new Date()): AppData {
@@ -155,6 +155,14 @@ export const MIGRATIONS: Record<number, Migration> = {
       recall: d.recall ?? [],
     };
   },
+  3: (d) => {
+    // Programme part 2: maintenance mode, and monthly baseline check-ins. Additive only.
+    const p = d.programme;
+    const programme = typeof p === 'object' && p !== null && !Array.isArray(p)
+      ? { maintenanceStartedAt: null, ...(p as Json) }
+      : p ?? null;
+    return { ...d, schemaVersion: 4, programme };
+  },
 };
 
 export class MigrationError extends Error {}
@@ -215,7 +223,7 @@ const RECORD_CHECKS: Record<string, (x: Json) => boolean> = {
     isStrMap(x.answers) && isStrMap(x.choices, 120),
   values: (x) => isId(x.id) && isStr(x.sentence, 500) && isIso(x.updatedAt),
   baselines: (x) =>
-    isId(x.id) && (x.kind === 'start' || x.kind === 'finish') && isObj(x.ratings) &&
+    isId(x.id) && (x.kind === 'start' || x.kind === 'finish' || x.kind === 'checkin') && isObj(x.ratings) &&
     Object.entries(x.ratings).every(([k, v]) => k.length <= 60 && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 5) &&
     Array.isArray(x.situations) && x.situations.length <= 5 && x.situations.every((t) => isStr(t, 4000)) && isIso(x.completedAt) && isIso(x.updatedAt),
   reviews: (x) =>
@@ -232,7 +240,7 @@ const COLLECTIONS = Object.keys(RECORD_CHECKS);
 const isSettings = (s: unknown) =>
   isObj(s) && isStr(s.displayName, 80) && typeof s.streaksEnabled === 'boolean' && ['system', 'light', 'dark'].includes(String(s.theme)) &&
   isOptIso(s.lastExportAt) && (s.backupNudgeDismissedOn === null || isDateKey(s.backupNudgeDismissedOn)) && isTime(s.reminderTime);
-const isProgramme = (p: unknown) => p === null || (isObj(p) && isIso(p.startedAt) && isOptIso(p.disclaimerSeenAt));
+const isProgramme = (p: unknown) => p === null || (isObj(p) && isIso(p.startedAt) && isOptIso(p.disclaimerSeenAt) && isOptIso(p.maintenanceStartedAt));
 const isInProgress = (ip: unknown) =>
   ip === null || (isObj(ip) && (ip.kind === 'scenario' || ip.kind === 'practice') && isId(ip.refId) && isIso(ip.startedAt) && isStr(ip.draft));
 

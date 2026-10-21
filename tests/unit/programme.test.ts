@@ -15,7 +15,7 @@ const done = (d: AppData, ...ids: string[]): AppData => ({
   ...d,
   sessions: [...d.sessions, ...ids.map((id) => ({ id: `ses_${id}`, sessionId: id, completedAt: new Date(at('2026-10-20')).toISOString(), updatedAt: new Date(at('2026-10-20')).toISOString(), mode: 'think' as const, answers: {}, choices: {} }))],
 });
-const enrolled = (): AppData => ({ ...emptyData(), programme: { startedAt: new Date(at('2026-10-20')).toISOString(), disclaimerSeenAt: null } });
+const enrolled = (): AppData => ({ ...emptyData(), programme: { startedAt: new Date(at('2026-10-20')).toISOString(), disclaimerSeenAt: null, maintenanceStartedAt: null } });
 
 describe('programme engine: order and unlocking', () => {
   it('has Day 0 and six sessions in each of six weeks (Day 7 is rest)', () => {

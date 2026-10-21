@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { emptyData } from '../../src/storage/schema';
+import { emptyData, SCHEMA_VERSION } from '../../src/storage/schema';
 import { exportJson, mergeData, parseImport, summarize } from '../../src/storage/transfer';
 import type { AppData } from '../../src/types';
 
@@ -38,7 +38,7 @@ describe('export and import', () => {
     const v1 = { schemaVersion: 1, createdAt: t, onboardingCompletedAt: t, settings: { displayName: '', streaksEnabled: false, theme: 'system' }, intentions: [], attempts: [], journal: [], library: [] };
     const r = parseImport(JSON.stringify({ app: 'equanim', exportedAt: t, data: v1 }));
     expect(r.ok).toBe(true);
-    if (r.ok) expect(r.data.schemaVersion).toBe(3);
+    if (r.ok) expect(r.data.schemaVersion).toBe(SCHEMA_VERSION);
   });
   it('rejects invalid files with a helpful message', () => {
     expect(parseImport('hello')).toEqual({ ok: false, error: 'This file is not valid JSON.' });

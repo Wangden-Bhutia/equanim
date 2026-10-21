@@ -346,7 +346,7 @@ export function StoreProvider({ children, adapter, locks, channel }: {
 
     startProgramme: () => {
       const t = now();
-      update((d) => (d.programme ? d : { ...d, programme: { startedAt: t, disclaimerSeenAt: null } }));
+      update((d) => (d.programme ? d : { ...d, programme: { startedAt: t, disclaimerSeenAt: null, maintenanceStartedAt: null } }));
     },
     markDisclaimerSeen: () => {
       const t = now();
