@@ -7,7 +7,9 @@ import { emptyData } from '../storage/schema';
 import { mergeData } from '../storage/transfer';
 import { dateKey } from '../engine/dates';
 import { newId } from '../engine/id';
-import type { AppData, DomainId, EveningReflection, IntentionCategory, JournalEntry, Settings } from '../types';
+import type { AppData, DomainId, EveningReflection, IntentionCategory, JournalEntry, PlanOutcome, SessionMode, Settings } from '../types';
+import { DAY0_ID } from '../data/programme';
+import { recordRecall, sessionRecordId } from '../engine/programme';
 
 export type JournalDraft = Omit<JournalEntry, 'id' | 'createdAt' | 'updatedAt'>;
 export type ReflectionDraft = Pick<EveningReflection, 'happened' | 'initial' | 'did' | 'alternative' | 'nextTime'>;
@@ -55,6 +57,18 @@ interface StoreValue {
   resetAll: () => void;
   safetyCopies: () => ReturnType<Repository['safetyCopies']>;
   readSafetyCopy: (key: string) => string | null;
+  // 6-week programme
+  startProgramme: () => void;
+  markDisclaimerSeen: () => void;
+  saveValues: (choices: { id: string; sentence: string }[]) => void;
+  saveBaseline: (kind: 'start' | 'finish', ratings: Record<string, number>, situations: string[]) => void;
+  completeSession: (sessionId: string, mode: SessionMode, answers: Record<string, string>, choices?: Record<string, string>) => void;
+  saveReview: (week: number, review: { worked: string; gotInWay: string; noticed: string; rating: number | null }) => void;
+  savePlan: (plan: { when: string; then: string; domain: DomainId | null }) => void;
+  checkPlan: (outcome: PlanOutcome, note: string) => void;
+  answerRecall: (questionId: string, correct: boolean) => void;
+  markExported: () => void;
+  dismissBackupNudge: () => void;
 }
 
 type Change = (d: AppData, ctx: TransactContext) => AppData;
@@ -62,6 +76,15 @@ const PREVIEW: TransactContext = { setAside: () => {}, live: false };
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
 const StoreContext = createContext<StoreValue | null>(null);
+
+/** Marks a session complete. Completing again keeps the first completion time and updates the answers. */
+function withSession(d: AppData, sessionId: string, mode: SessionMode, answers: Record<string, string>, choices: Record<string, string>, t: string): AppData {
+  const id = sessionRecordId(sessionId);
+  const prev = d.sessions.find((s) => s.id === id);
+  const clean = Object.fromEntries(Object.entries(answers).map(([k, v]) => [k, v.trim()]).filter(([, v]) => v));
+  const rec = { id, sessionId, completedAt: prev?.completedAt ?? t, updatedAt: t, mode, answers: { ...(prev?.answers ?? {}), ...clean }, choices: { ...(prev?.choices ?? {}), ...choices } };
+  return { ...d, sessions: prev ? d.sessions.map((s) => (s.id === id ? rec : s)) : [...d.sessions, rec] };
+}
 
 export function StoreProvider({ children, adapter, locks, channel }: {
   children: ReactNode;
@@ -190,7 +213,7 @@ export function StoreProvider({ children, adapter, locks, channel }: {
 
   /** Replaces today's intention or reflection. If another tab changed it since this tab showed it, that version is set aside, not lost. */
   function replaceForDay<T extends { id: string; date: string; updatedAt: string }>(
-    collection: 'intentions' | 'reflections', make: (existing: T | undefined) => T,
+    collection: 'intentions' | 'reflections' | 'plans', make: (existing: T | undefined) => T,
   ): void {
     const date = dateKey();
     const seen = (dataRef.current[collection] as unknown as T[]).find((x) => x.date === date);
@@ -320,6 +343,75 @@ export function StoreProvider({ children, adapter, locks, channel }: {
     },
     safetyCopies: () => repo.safetyCopies(),
     readSafetyCopy: (key) => repo.readRaw(key),
+
+    startProgramme: () => {
+      const t = now();
+      update((d) => (d.programme ? d : { ...d, programme: { startedAt: t, disclaimerSeenAt: null } }));
+    },
+    markDisclaimerSeen: () => {
+      const t = now();
+      update((d) => ({ ...d, programme: d.programme ? { ...d.programme, disclaimerSeenAt: d.programme.disclaimerSeenAt ?? t } : d.programme }));
+    },
+    saveValues: (choices) => {
+      const t = now();
+      update((d) => ({
+        ...d,
+        values: choices.map((c) => {
+          const prev = d.values.find((v) => v.id === c.id);
+          const sentence = c.sentence.trim();
+          return prev && prev.sentence === sentence ? prev : { id: c.id, sentence, updatedAt: t };
+        }),
+      }));
+    },
+    saveBaseline: (kind, ratings, situations) => {
+      const t = now();
+      const id = `bl_${kind}`;
+      update((d) => {
+        const prev = d.baselines.find((b) => b.id === id);
+        const rec = { id, kind, ratings, situations: situations.map((x) => x.trim()), completedAt: prev?.completedAt ?? t, updatedAt: t };
+        const next = { ...d, baselines: prev ? d.baselines.map((b) => (b.id === id ? rec : b)) : [...d.baselines, rec] };
+        return kind === 'start' ? withSession(next, DAY0_ID, 'write', {}, {}, t) : next;
+      });
+    },
+    completeSession: (sessionId, mode, answers, choices = {}) => {
+      const t = now();
+      update((d) => withSession(d, sessionId, mode, answers, choices, t));
+    },
+    saveReview: (week, review) => {
+      const t = now();
+      const id = `rev_w${week}`;
+      update((d) => {
+        const prev = d.reviews.find((r) => r.id === id);
+        const rec = { id, week, worked: review.worked.trim(), gotInWay: review.gotInWay.trim(), noticed: review.noticed.trim(), rating: review.rating, completedAt: prev?.completedAt ?? t, updatedAt: t };
+        const next = { ...d, reviews: prev ? d.reviews.map((r) => (r.id === id ? rec : r)) : [...d.reviews, rec] };
+        return withSession(next, `w${week}d6`, 'write', {}, {}, t);
+      });
+    },
+    savePlan: (plan) => {
+      const t = now();
+      const id = newId('pln');
+      replaceForDay<AppData['plans'][number]>('plans', (x) =>
+        x ? { ...x, when: plan.when.trim(), then: plan.then.trim(), domain: plan.domain, updatedAt: t }
+          : { id, date: dateKey(), domain: plan.domain, when: plan.when.trim(), then: plan.then.trim(), outcome: null, note: '', createdAt: t, updatedAt: t });
+    },
+    checkPlan: (outcome, note) => {
+      const t = now();
+      const date = dateKey();
+      update((d) => ({ ...d, plans: d.plans.map((p) => (p.date === date ? { ...p, outcome, note: note.trim(), updatedAt: t } : p)) }));
+    },
+    answerRecall: (questionId, correct) => {
+      const t = now();
+      const today = dateKey();
+      update((d) => ({ ...d, recall: recordRecall(d.recall, questionId, today, correct, t) }));
+    },
+    markExported: () => {
+      const t = now();
+      update((d) => ({ ...d, settings: { ...d.settings, lastExportAt: t } }));
+    },
+    dismissBackupNudge: () => {
+      const today = dateKey();
+      update((d) => ({ ...d, settings: { ...d.settings, backupNudgeDismissedOn: today } }));
+    },
   };
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
