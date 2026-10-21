@@ -17,7 +17,7 @@ export function currentDomain(cur: string | null): DomainId {
 function Chips({ items, onPick, label }: { items: string[]; onPick: (t: string) => void; label: string }) {
   return (
     <div className="flex flex-wrap gap-2 mt-2" role="group" aria-label={label}>
-      {items.map((t) => <button key={t} type="button" className="rounded-full border border-line px-3 min-h-[40px] text-[13.5px] text-ink hover:bg-surface2" onClick={() => onPick(t)}>{t}</button>)}
+      {items.map((t) => <button key={t} type="button" className="rounded-full border border-line px-3 min-h-[44px] text-[13.5px] text-ink hover:bg-surface2" onClick={() => onPick(t)}>{t}</button>)}
     </div>
   );
 }

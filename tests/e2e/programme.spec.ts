@@ -1,0 +1,185 @@
+/**
+ * The 6-week programme, Week 0 and Week 1, end to end in EMULATED Chromium (Pixel 7 profile; not a real device).
+ * axe runs on every screen at 390x844 in light and dark, and at 360px wide.
+ * Set PROG_SHOTS to a folder to save screenshots.
+ */
+import { test, expect, type Page } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
+import fs from 'node:fs';
+
+const SHOTS = process.env.PROG_SHOTS;
+test.setTimeout(240000);
+
+async function axe(page: Page, where: string) {
+  const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+  const serious = r.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
+  expect(serious.map((v) => `${where}: ${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([]);
+}
+
+/** Checks (and optionally photographs) the current screen in light and dark at 390x844, and at 360px wide. */
+async function check(page: Page, name: string, opts: { narrow?: boolean; fullPage?: boolean } = {}) {
+  const fullPage = opts.fullPage ?? true;
+  const variants: { scheme: 'light' | 'dark'; width: number; suffix: string }[] = [
+    { scheme: 'light', width: 390, suffix: '390-light' },
+    { scheme: 'dark', width: 390, suffix: '390-dark' },
+    { scheme: 'light', width: 360, suffix: '360-light' },
+  ];
+  for (const v of variants) {
+    await page.setViewportSize({ width: v.width, height: 844 });
+    await page.emulateMedia({ colorScheme: v.scheme });
+    await expect(page.locator('html')).toHaveAttribute('data-theme', v.scheme);
+    // Let colour transitions settle so contrast is never sampled mid-change.
+    await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => undefined))));
+    await page.waitForTimeout(250);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow, `${name} @${v.suffix}: horizontal overflow`).toBeLessThanOrEqual(0);
+    await axe(page, `${name} @${v.suffix}`);
+    if (SHOTS && (v.width === 390 || opts.narrow)) {
+      fs.mkdirSync(SHOTS, { recursive: true });
+      // What the phone screen shows.
+      await page.screenshot({ path: `${SHOTS}/${name}-${v.suffix}.png` });
+      // The whole page, with the bottom bar unpinned for the capture only (a fixed bar would otherwise be painted mid-page).
+      if (fullPage) {
+        const style = await page.addStyleTag({ content: 'nav[aria-label="Primary"]{position:static!important}' });
+        await page.screenshot({ path: `${SHOTS}/${name}-${v.suffix}-full.png`, fullPage: true });
+        await style.evaluate((el) => el.remove());
+      }
+    }
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ colorScheme: 'light' });
+}
+
+const startNext = async (page: Page) => {
+  await page.goto('./#/');
+  await page.getByRole('link', { name: /Start (next )?session/ }).click();
+};
+
+test('[SIMULATED phone] welcome → Day 0 → Week 1 sessions → if-then plan → evening check → weekly review', async ({ page }) => {
+  await page.goto('./');
+  await page.evaluate(() => localStorage.clear());
+  await page.goto('./');
+
+  // Welcome
+  await expect(page.getByRole('heading', { level: 1, name: /Respond, rather than react/ })).toBeVisible();
+  await expect(page.getByText(/Tele-MANAS 14416/)).toBeVisible();
+  await check(page, '01-onboarding-welcome', { narrow: true });
+  await page.getByRole('button', { name: 'Begin Day 0' }).click();
+
+  // Day 0: values
+  await expect(page.getByRole('heading', { level: 1, name: 'Your values' })).toBeVisible();
+  for (const v of ['Honesty', 'Calm', 'Kindness']) await page.locator('label').filter({ hasText: new RegExp(`^${v}$`) }).click();
+  await page.getByRole('textbox', { name: 'Honesty' }).fill('Say what I actually mean in meetings.');
+  await page.getByRole('textbox', { name: 'Calm' }).fill('Take one breath before replying to a sharp message.');
+  await page.getByRole('textbox', { name: 'Kindness' }).fill('Call my mother on Sunday and listen.');
+  await check(page, '02-day0-values', { narrow: true });
+  await page.getByRole('button', { name: 'Save and continue' }).click();
+
+  // Day 0: baseline
+  await expect(page.getByRole('heading', { level: 1, name: 'Where you are starting' })).toBeVisible();
+  const groups = page.locator('main fieldset');
+  const n = await groups.count();
+  for (let i = 0; i < n; i++) await groups.nth(i).locator('label').nth((i % 4) + 1).click();
+  await page.getByLabel(/Describe a recent situation/).fill('A colleague replied "fine." and I spent the evening replaying it.');
+  await check(page, '03-day0-baseline', { narrow: true });
+  await page.getByRole('button', { name: 'Finish Day 0' }).click();
+
+  // Disclaimer after the first completed session
+  const dlg = page.getByRole('dialog', { name: 'Before you go further' });
+  await expect(dlg).toBeVisible();
+  await check(page, '04-disclaimer', { fullPage: false });
+  await dlg.getByRole('button', { name: 'I understand' }).click();
+
+  // Today, new user
+  await expect(page.getByText('Week 1 · Day 1 of 42')).toBeVisible();
+  await check(page, '05-today-new-user', { narrow: true });
+
+  // If-then builder
+  await page.getByRole('link', { name: /Morning plan/ }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Today’s if-then plan' })).toBeVisible();
+  await page.getByRole('button', { name: /Use a suggested plan/ }).click();
+  await check(page, '06-if-then-builder', { narrow: true });
+  await page.getByRole('button', { name: 'Save plan' }).click();
+
+  // Week 1, Day 1: Understand
+  await startNext(page);
+  await expect(page.getByText(/Week 1 · Day 1 of 42 · Understand/)).toBeVisible();
+  await check(page, '07-w1d1-understand');
+  await page.getByRole('button', { name: 'Complete session' }).click();
+  await expect(page.getByText('Session complete')).toBeVisible();
+
+  // Day 2: Recognise
+  await startNext(page);
+  await expect(page.getByText(/Day 2 of 42 · Recognise/)).toBeVisible();
+  await page.locator('main fieldset').nth(1).locator('label').first().click();
+  await check(page, '08-w1d2-recognise');
+  await page.getByRole('button', { name: 'Complete session' }).click();
+
+  // Day 3: Rehearse, in "Write it down" mode
+  await startNext(page);
+  await expect(page.getByText(/Day 3 of 42 · Rehearse/)).toBeVisible();
+  await page.locator('label').filter({ hasText: 'Write it down' }).click();
+  await page.locator('main textarea').first().fill('“I may be reading too much into this.”');
+  await check(page, '09-w1d3-rehearse-write');
+  await page.getByRole('button', { name: 'Complete session' }).click();
+
+  // Evening check, and Today mid-week
+  await page.goto('./#/');
+  const ev = page.getByRole('region', { name: 'Evening check' });
+  await ev.locator('label').filter({ hasText: 'I didn’t manage it' }).click();
+  await ev.getByLabel(/A note/).fill('Replied straight away. Noticed afterwards.');
+  await ev.getByRole('button', { name: 'Save evening check' }).click();
+  await expect(ev.getByText(/useful information, not a verdict/)).toBeVisible();
+  await ev.scrollIntoViewIfNeeded();
+  await check(page, '10-evening-check', { narrow: true, fullPage: false });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect(page.getByText('Week 1 · Day 4 of 42')).toBeVisible();
+  await check(page, '11-today-mid-week', { narrow: true });
+
+  // Day 4: Apply
+  await startNext(page);
+  await expect(page.getByText(/Day 4 of 42 · Apply/)).toBeVisible();
+  await check(page, '12-w1d4-apply');
+  await page.getByRole('button', { name: 'Complete session' }).click();
+
+  // Day 5: Retrieve and extend
+  await startNext(page);
+  await expect(page.getByText(/Day 5 of 42 · Retrieve/)).toBeVisible();
+  await page.locator('main fieldset').nth(1).locator('label').nth(1).click();
+  await check(page, '13-w1d5-retrieve');
+  await page.getByRole('button', { name: 'Complete session' }).click();
+
+  // Day 6: Weekly review
+  await startNext(page);
+  await expect(page.getByRole('heading', { level: 1, name: /Week 1 review/ })).toBeVisible();
+  await page.getByLabel('What worked this week?').fill('Writing down what happened before what it meant.');
+  await page.getByLabel('What got in the way?').fill('Busy mornings.');
+  await page.locator('label').filter({ hasText: /^4/ }).last().click();
+  await check(page, '14-weekly-review', { narrow: true });
+  await page.getByRole('button', { name: 'Complete review' }).click();
+  await expect(page.getByText('Week 1 review saved')).toBeVisible();
+
+  await page.goto('./#/');
+  await expect(page.getByText(/Week 2 arrives in the next update/)).toBeVisible();
+  await check(page, '15-today-week1-done');
+
+  // Everything is saved under the 1.1 store key; the 1.0 key is never written.
+  const saved = await page.evaluate(() => ({ store: JSON.parse(localStorage.getItem('equanim:store') ?? 'null'), legacy: localStorage.getItem('equanim:data') }));
+  expect(saved.legacy).toBeNull();
+  expect(saved.store.schemaVersion).toBe(3);
+  expect(saved.store.data.sessions.map((s: { sessionId: string }) => s.sessionId)).toEqual(['w0d0', 'w1d1', 'w1d2', 'w1d3', 'w1d4', 'w1d5', 'w1d6']);
+  expect(saved.store.data.plans[0]).toMatchObject({ outcome: 'didnt-manage' });
+});
+
+test('[SIMULATED phone] taster, then the programme offer for an existing 1.1 user', async ({ page }) => {
+  await page.goto('./');
+  await page.evaluate(() => localStorage.clear());
+  await page.goto('./');
+  await page.getByRole('link', { name: 'Try a 2-minute taster first' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'The camera view' })).toBeVisible();
+  await check(page, '16-taster');
+  await page.goto('./#/welcome');
+  await page.getByRole('button', { name: 'Look around without starting' }).click();
+  await expect(page.getByRole('heading', { name: /6-week programme/ })).toBeVisible();
+  await check(page, '17-today-existing-user-offer');
+});
