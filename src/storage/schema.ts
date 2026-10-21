@@ -1,6 +1,6 @@
 import { DOMAIN_IDS, type AppData, type DomainId } from '../types';
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 export const MAX_TEXT = 20000;
 
 export function emptyData(now: Date = new Date()): AppData {
@@ -8,7 +8,7 @@ export function emptyData(now: Date = new Date()): AppData {
     schemaVersion: SCHEMA_VERSION,
     createdAt: now.toISOString(),
     onboardingCompletedAt: null,
-    settings: { displayName: '', streaksEnabled: false, theme: 'system' },
+    settings: { ...DEFAULT_SETTINGS },
     intentions: [],
     reflections: [],
     practices: [],
@@ -17,8 +17,19 @@ export function emptyData(now: Date = new Date()): AppData {
     journal: [],
     library: [],
     inProgress: null,
+    programme: null,
+    sessions: [],
+    values: [],
+    baselines: [],
+    reviews: [],
+    plans: [],
+    recall: [],
   };
 }
+
+export const DEFAULT_SETTINGS = { displayName: '', streaksEnabled: false, theme: 'system', lastExportAt: null, backupNudgeDismissedOn: null, reminderTime: null } as const satisfies AppData['settings'];
+/** Collections added in schema v3 (the 6-week programme). */
+export const PROGRAMME_COLLECTIONS = ['sessions', 'values', 'baselines', 'reviews', 'plans', 'recall'] as const;
 
 type Json = Record<string, unknown>;
 type Migration = (input: Json) => Json;
@@ -127,6 +138,23 @@ export const MIGRATIONS: Record<number, Migration> = {
       inProgress: null,
     };
   },
+  2: (d) => {
+    // Equanim 1.1 → 1.2 (6-week programme). Additive only: every existing value is carried over untouched.
+    // Existing users are not enrolled; the programme is offered on Today.
+    const settings = (typeof d.settings === 'object' && d.settings !== null ? d.settings : {}) as Json;
+    return {
+      ...d,
+      schemaVersion: 3,
+      settings: { lastExportAt: null, backupNudgeDismissedOn: null, reminderTime: null, ...settings },
+      programme: d.programme ?? null,
+      sessions: d.sessions ?? [],
+      values: d.values ?? [],
+      baselines: d.baselines ?? [],
+      reviews: d.reviews ?? [],
+      plans: d.plans ?? [],
+      recall: d.recall ?? [],
+    };
+  },
 };
 
 export class MigrationError extends Error {}
@@ -156,6 +184,9 @@ const isIso = (v: unknown): v is string => typeof v === 'string' && v.length <= 
 const isDateKey = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
 const isDomain = (v: unknown): v is DomainId => typeof v === 'string' && (DOMAIN_IDS as string[]).includes(v);
 const isId = (v: unknown): v is string => typeof v === 'string' && v.length > 0 && v.length <= 120;
+const isStrMap = (v: unknown, max = MAX_TEXT) => isObj(v) && Object.entries(v).every(([k, x]) => k.length <= 60 && isStr(x, max));
+const isOptIso = (v: unknown) => v === null || isIso(v);
+const isTime = (v: unknown) => v === null || (typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v));
 const CATEGORIES = ['speak-carefully', 'separate-observation', 'ask-before-assuming', 'pause-before-responding', 'sincere-effort', 'custom'];
 
 const isLegacyCheckIn = (v: unknown) =>
@@ -179,10 +210,29 @@ const RECORD_CHECKS: Record<string, (x: Json) => boolean> = {
     Array.isArray(x.themes) && x.themes.length <= 20 && x.themes.every((t) => isStr(t, 40)) &&
     isIso(x.createdAt) && isIso(x.updatedAt),
   library: (x) => isId(x.itemId) && ['opened', 'completed', 'exercise'].includes(String(x.kind)) && isIso(x.at),
+  sessions: (x) =>
+    isId(x.id) && isId(x.sessionId) && isIso(x.completedAt) && isIso(x.updatedAt) && (x.mode === 'think' || x.mode === 'write') &&
+    isStrMap(x.answers) && isStrMap(x.choices, 120),
+  values: (x) => isId(x.id) && isStr(x.sentence, 500) && isIso(x.updatedAt),
+  baselines: (x) =>
+    isId(x.id) && (x.kind === 'start' || x.kind === 'finish') && isObj(x.ratings) &&
+    Object.entries(x.ratings).every(([k, v]) => k.length <= 60 && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 5) &&
+    Array.isArray(x.situations) && x.situations.length <= 5 && x.situations.every((t) => isStr(t, 4000)) && isIso(x.completedAt) && isIso(x.updatedAt),
+  reviews: (x) =>
+    isId(x.id) && Number.isInteger(x.week) && (x.week as number) >= 1 && (x.week as number) <= 6 && isStr(x.worked) && isStr(x.gotInWay) && isStr(x.noticed) &&
+    (x.rating === null || (Number.isInteger(x.rating) && (x.rating as number) >= 1 && (x.rating as number) <= 5)) && isIso(x.completedAt) && isIso(x.updatedAt),
+  plans: (x) =>
+    isId(x.id) && isDateKey(x.date) && (x.domain === null || isDomain(x.domain)) && isStr(x.when, 300) && isStr(x.then, 300) &&
+    (x.outcome === null || ['not-came-up', 'tried', 'didnt-manage'].includes(String(x.outcome))) && isStr(x.note) && isIso(x.createdAt) && isIso(x.updatedAt),
+  recall: (x) =>
+    isId(x.id) && isDateKey(x.firstSeen) && Array.isArray(x.reviewed) && x.reviewed.length <= 50 && x.reviewed.every(isDateKey) &&
+    typeof x.lastCorrect === 'boolean' && isIso(x.updatedAt),
 };
 const COLLECTIONS = Object.keys(RECORD_CHECKS);
 const isSettings = (s: unknown) =>
-  isObj(s) && isStr(s.displayName, 80) && typeof s.streaksEnabled === 'boolean' && ['system', 'light', 'dark'].includes(String(s.theme));
+  isObj(s) && isStr(s.displayName, 80) && typeof s.streaksEnabled === 'boolean' && ['system', 'light', 'dark'].includes(String(s.theme)) &&
+  isOptIso(s.lastExportAt) && (s.backupNudgeDismissedOn === null || isDateKey(s.backupNudgeDismissedOn)) && isTime(s.reminderTime);
+const isProgramme = (p: unknown) => p === null || (isObj(p) && isIso(p.startedAt) && isOptIso(p.disclaimerSeenAt));
 const isInProgress = (ip: unknown) =>
   ip === null || (isObj(ip) && (ip.kind === 'scenario' || ip.kind === 'practice') && isId(ip.refId) && isIso(ip.startedAt) && isStr(ip.draft));
 
@@ -200,6 +250,7 @@ export function validateAppData(d: unknown): { ok: true; data: AppData } | { ok:
     v.forEach((x, i) => { if (!isObj(x) || !RECORD_CHECKS[key]!(x)) fail(`${key}[${i}] is invalid.`); });
   }
   if (!isInProgress(d.inProgress)) fail('inProgress is invalid.');
+  if (!isProgramme(d.programme)) fail('programme is invalid.');
   if (errors.length) return { ok: false, errors };
   return { ok: true, data: d as unknown as AppData };
 }
@@ -223,6 +274,9 @@ export function salvage(d: Json): { data: AppData; dropped: number } | null {
       displayName: isStr(s.displayName, 80) ? s.displayName : '',
       streaksEnabled: typeof s.streaksEnabled === 'boolean' ? s.streaksEnabled : false,
       theme: ['system', 'light', 'dark'].includes(String(s.theme)) ? s.theme : 'system',
+      lastExportAt: isIso(s.lastExportAt) ? s.lastExportAt : null,
+      backupNudgeDismissedOn: isDateKey(s.backupNudgeDismissedOn) ? s.backupNudgeDismissedOn : null,
+      reminderTime: isTime(s.reminderTime) ? s.reminderTime ?? null : null,
     };
     dropped++;
   }
@@ -234,6 +288,8 @@ export function salvage(d: Json): { data: AppData; dropped: number } | null {
     out[key] = kept;
   }
   out.inProgress = isInProgress(d.inProgress) ? d.inProgress ?? null : null;
+  if (isProgramme(d.programme ?? null)) out.programme = d.programme ?? null;
+  else { out.programme = null; dropped++; }
   const v = validateAppData(out);
   return v.ok ? { data: v.data, dropped } : null;
 }

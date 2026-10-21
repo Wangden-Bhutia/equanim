@@ -16,7 +16,7 @@ export function exportFileName(now: Date = new Date()): string {
 }
 
 export interface DataSummary {
-  intentions: number; reflections: number; practices: number; attempts: number; scenarios: number; journal: number; library: number;
+  intentions: number; reflections: number; practices: number; attempts: number; scenarios: number; journal: number; library: number; sessions: number;
 }
 
 export function summarize(d: AppData): DataSummary {
@@ -28,6 +28,7 @@ export function summarize(d: AppData): DataSummary {
     scenarios: new Set(d.completions.map((c) => c.scenarioId)).size,
     journal: d.journal.length,
     library: d.library.length,
+    sessions: d.sessions.length,
   };
 }
 
@@ -95,5 +96,12 @@ export function mergeData(current: AppData, incoming: AppData): AppData {
     completions: mergeById(current.completions, incoming.completions, (x) => x.at),
     journal: mergeById(current.journal, incoming.journal, (x) => x.updatedAt),
     library: [...lib.values()],
+    programme: current.programme ?? incoming.programme,
+    sessions: mergeById(current.sessions, incoming.sessions, (x) => x.updatedAt),
+    values: current.values.length ? current.values : incoming.values,
+    baselines: mergeById(current.baselines, incoming.baselines, (x) => x.updatedAt),
+    reviews: mergeById(current.reviews, incoming.reviews, (x) => x.updatedAt),
+    plans: onePerDay(current.plans, incoming.plans),
+    recall: mergeById(current.recall, incoming.recall, (x) => x.updatedAt),
   };
 }

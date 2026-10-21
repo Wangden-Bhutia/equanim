@@ -21,8 +21,11 @@ const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
 
 const TIME: Record<string, string> = {
   intentions: 'updatedAt', reflections: 'updatedAt', journal: 'updatedAt', practices: 'completedAt', attempts: 'at', completions: 'at',
+  // Schema v3 (programme). Same rules: record-level, newest edit kept, the other set aside.
+  sessions: 'updatedAt', values: 'updatedAt', baselines: 'updatedAt', reviews: 'updatedAt', plans: 'updatedAt', recall: 'updatedAt',
 };
-export const ID_COLLECTIONS = Object.keys(TIME) as (keyof Pick<AppData, 'intentions' | 'reflections' | 'journal' | 'practices' | 'attempts' | 'completions'>)[];
+export const ID_COLLECTIONS = Object.keys(TIME) as (keyof Pick<AppData,
+  'intentions' | 'reflections' | 'journal' | 'practices' | 'attempts' | 'completions' | 'sessions' | 'values' | 'baselines' | 'reviews' | 'plans' | 'recall'>)[];
 const libKey = (r: AppData['library'][number]) => `${r.itemId}|${r.kind}|${r.at}`;
 
 function mergeList<T>(collection: string, key: (x: T) => string, time: (x: T) => string, base: T[], ours: T[], theirs: T[], out: SetAside[]): T[] {
@@ -74,6 +77,13 @@ function scalar<T>(b: T, o: T, t: T): T {
   return o; // both changed: this tab's value is kept (settings and the in-progress draft have no timestamps)
 }
 
+function fieldwise<T extends object>(b: T, o: T, t: T): T {
+  const out = { ...o } as Record<string, unknown>;
+  const B = b as Record<string, unknown>, O = o as Record<string, unknown>, Th = t as Record<string, unknown>;
+  for (const k of new Set([...Object.keys(O), ...Object.keys(Th)])) out[k] = scalar(B[k], O[k], Th[k]);
+  return out as T;
+}
+
 export function merge3(base: AppData, ours: AppData, theirs: AppData): MergeResult {
   const out: SetAside[] = [];
   const d: AppData = { ...ours };
@@ -84,12 +94,13 @@ export function merge3(base: AppData, ours: AppData, theirs: AppData): MergeResu
   d.library = mergeList('library', libKey, (x) => x.at, base.library, ours.library, theirs.library, out);
   d.intentions = onePerDay('intentions', d.intentions, out);
   d.reflections = onePerDay('reflections', d.reflections, out);
-  d.settings = {
-    displayName: scalar(base.settings.displayName, ours.settings.displayName, theirs.settings.displayName),
-    streaksEnabled: scalar(base.settings.streaksEnabled, ours.settings.streaksEnabled, theirs.settings.streaksEnabled),
-    theme: scalar(base.settings.theme, ours.settings.theme, theirs.settings.theme),
-  };
+  d.plans = onePerDay('plans', d.plans, out);
+  d.settings = fieldwise(base.settings, ours.settings, theirs.settings);
   d.inProgress = scalar(base.inProgress, ours.inProgress, theirs.inProgress);
+  // Enrolment: field by field; if only one side has started the programme, it stays started.
+  d.programme = !ours.programme || !theirs.programme
+    ? ours.programme ?? theirs.programme ?? null
+    : fieldwise(base.programme ?? ours.programme, ours.programme, theirs.programme);
   const onboard = [ours.onboardingCompletedAt, theirs.onboardingCompletedAt].filter((x): x is string => !!x).sort()[0] ?? null;
   d.onboardingCompletedAt = onboard;
   d.createdAt = [ours.createdAt, theirs.createdAt].sort()[0] as string;
