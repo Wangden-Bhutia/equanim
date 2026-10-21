@@ -61,21 +61,20 @@ test('narrow width: nothing hidden behind the bottom navigation, no overflow, no
   for (const route of ['#/', '#/practise', '#/journal', '#/library', '#/progress', '#/settings', '#/more', '#/practise/a-landlord-call', '#/programme', '#/plan', '#/session/taster']) {
     await page.goto(`./${route}`);
     await page.locator('main h1').first().waitFor();
-    // Scroll until the page is really at the bottom (fonts and lazy layout can still grow it after the first scroll).
-    await expect.poll(() => page.evaluate(() => {
+    // Scroll to the bottom and measure in one step, retrying while the page is still settling (fonts and late
+    // layout can grow it after the first scroll, which made this check flaky in CI).
+    const measure = () => page.evaluate(() => {
       window.scrollTo(0, document.documentElement.scrollHeight);
-      return Math.ceil(window.scrollY + window.innerHeight) >= document.documentElement.scrollHeight - 1;
-    })).toBe(true);
-    const r = await page.evaluate(() => {
+      const atBottom = Math.ceil(window.scrollY + window.innerHeight) >= document.documentElement.scrollHeight - 1;
       const nav = document.querySelectorAll('nav[aria-label="Primary"]');
       const bar = nav[nav.length - 1]!.getBoundingClientRect();
       const main = document.querySelector('main')!;
       const items = Array.from(main.querySelectorAll('a, button, input, textarea, p, h2')).filter((e) => (e as HTMLElement).offsetParent);
       const last = items[items.length - 1]!.getBoundingClientRect();
-      return { lastBottom: last.bottom, barTop: bar.top, overflow: document.documentElement.scrollWidth - window.innerWidth };
+      return { atBottom, hidden: last.bottom > bar.top, overflow: document.documentElement.scrollWidth - window.innerWidth };
     });
-    expect(r.overflow, route).toBeLessThanOrEqual(0);
-    expect(r.lastBottom, `${route}: last content is behind the bottom bar`).toBeLessThanOrEqual(r.barTop);
+    await expect.poll(async () => { const m = await measure(); return m.atBottom && !m.hidden; }, { message: `${route}: last content is behind the bottom bar` }).toBe(true);
+    expect((await measure()).overflow, route).toBeLessThanOrEqual(0);
   }
   // Cumulative layout shift while Today loads.
   await page.goto('./#/');
