@@ -98,6 +98,31 @@ export function dayLabel(key: string, opts: Intl.DateTimeFormatOptions = { weekd
   return new Date(y, m - 1, dd).toLocaleDateString(undefined, opts);
 }
 
+// ---------- Real-life practice (Apply and the weekly review) ----------
+
+/** First day of a programme week: the day its Day 1 was completed, else the day the programme started. */
+export function weekStartKey(d: AppData, week: number): string | null {
+  const s = d.sessions.find((x) => x.sessionId === `w${week}d1`);
+  if (s) return keyFromIso(s.completedAt);
+  return d.programme ? keyFromIso(d.programme.startedAt) : null;
+}
+
+/** If-then plans made in this programme week, up to and including today. */
+export function plansThisWeek(d: AppData, week: number, today: string) {
+  const start = weekStartKey(d, week);
+  return d.plans.filter((p) => (start === null || p.date >= start) && p.date <= today);
+}
+
+/** Day 4 Apply can be completed once there is at least one if-then plan made today or earlier this week. */
+export const applyReady = (d: AppData, week: number, today: string) => plansThisWeek(d, week, today).length > 0;
+
+/** The full weekly review needs one real-life attempt recorded: a plan, or an evening check (plan outcome or evening reflection). */
+export function weekHasPractice(d: AppData, week: number, today: string): boolean {
+  if (plansThisWeek(d, week, today).length > 0) return true;
+  const start = weekStartKey(d, week);
+  return d.reflections.some((r) => (start === null || r.date >= start) && r.date <= today);
+}
+
 /** When the user has been away for more than a day, Today says "pick up where you left off". Never a penalty. */
 export function isReturning(d: AppData, today: string): boolean {
   if (!d.programme) return false;

@@ -156,7 +156,8 @@ describe('habit loop', () => {
   });
 
   it('weekly review completes Day 6; Today then moves on to Week 2', async () => {
-    seed(enrolled({ sessions: ses('w0d0', 'w1d1', 'w1d2', 'w1d3', 'w1d4', 'w1d5') }));
+    const plan = { id: 'p1', date: dateKey(), domain: null, valueId: null, when: 'a', then: 'b', outcome: 'tried' as const, note: '', createdAt: now(), updatedAt: now() };
+    seed(enrolled({ sessions: ses('w0d0', 'w1d1', 'w1d2', 'w1d3', 'w1d4', 'w1d5'), plans: [plan] }));
     const u = userEvent.setup();
     render(<App />);
     expect(await screen.findByText('Week 1 · Day 6 of 42')).toBeInTheDocument();
@@ -166,7 +167,7 @@ describe('habit loop', () => {
     await u.click(screen.getByRole('radio', { name: /4/ }));
     await u.click(screen.getByRole('button', { name: 'Complete review' }));
     expect(await screen.findByText('Week 1 review saved')).toBeInTheDocument();
-    expect(stored().reviews[0]).toMatchObject({ week: 1, worked: 'Pausing', rating: 4 });
+    expect(stored().reviews[0]).toMatchObject({ week: 1, worked: 'Pausing', rating: 4, catchUp: false });
     go('#/');
     expect(await screen.findByText('Week 2 · Day 8 of 42')).toBeInTheDocument();
   });

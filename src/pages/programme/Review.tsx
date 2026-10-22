@@ -3,8 +3,8 @@ import { Link, useParams } from 'react-router-dom';
 import { ArrowRight, Check, Lock } from 'lucide-react';
 import { useStore } from '../../app/store';
 import { OUTCOME_LABELS, REVIEW_PROMPTS, RATING_LABELS, SESSION_BY_ID, WEEKS } from '../../data/programme';
-import { keyFromIso } from '../../engine/dates';
-import { isUnlocked, weekDayLabel } from '../../engine/programme';
+import { dateKey } from '../../engine/dates';
+import { isUnlocked, plansThisWeek, weekDayLabel, weekHasPractice } from '../../engine/programme';
 import { PageHeader } from '../../components/ui';
 import { Confirmation } from '../../components/Confirmation';
 import { NotFound } from '../NotFound';
@@ -20,15 +20,18 @@ export function Review() {
   const [form, setForm] = useState({ worked: prev?.worked ?? '', gotInWay: prev?.gotInWay ?? '', noticed: prev?.noticed ?? '' });
   const [rating, setRating] = useState<number | null>(prev?.rating ?? null);
   const [saved, setSaved] = useState(false);
+  const [catchUp, setCatchUp] = useState(false);
   if (!def || !SESSION_BY_ID[sid]) return <NotFound />;
   const header = <PageHeader eyebrow={`${weekDayLabel(sid)} · Weekly review · about 15 min`} title={`Week ${week} review: ${def.title}`} back="/" />;
   if (!SESSION_BY_ID[sid]!.available) return <div>{header}<p className="card">This review arrives in the next update.</p></div>;
   if (!isUnlocked(data, sid)) {
     return <div>{header}<div className="card flex gap-3"><Lock size={20} className="text-muted shrink-0" aria-hidden="true" /><p>The review opens after this week’s other sessions. There is no deadline.</p></div></div>;
   }
-  // The week's plans, for context. A week is the seven days before the review was opened, or the plans made since the week started.
-  const weekStart = data.sessions.find((s) => s.sessionId === `w${week}d1`)?.completedAt;
-  const plans = data.plans.filter((p) => !weekStart || p.date >= keyFromIso(weekStart));
+  // The week's plans, for context: the plans made since this programme week started.
+  const today = dateKey();
+  const plans = plansThisWeek(data, week, today);
+  const practised = weekHasPractice(data, week, today);
+  const showForm = !!prev || practised || catchUp;
   const counts = { 'not-came-up': 0, tried: 0, 'didnt-manage': 0 } as Record<keyof typeof OUTCOME_LABELS, number>;
   plans.forEach((p) => { if (p.outcome) counts[p.outcome] += 1; });
 
@@ -47,7 +50,19 @@ export function Review() {
           </>
         )}
       </section>
-      <form className="card space-y-4" onSubmit={(e) => { e.preventDefault(); saveReview(week, { ...form, rating }); setSaved(true); }}>
+      {!showForm && (
+        <section className="card space-y-3" aria-labelledby="rv-catch" data-testid="review-needs-practice">
+          <h2 id="rv-catch" className="font-serif text-[19px] font-semibold">The review works best after a real-life try</h2>
+          <p className="text-[15px]">There is no plan or evening check recorded this week yet. One small plan, tried for a day, gives the review something real to look at.</p>
+          <div className="flex flex-wrap gap-2">
+            <Link to="/plan" className="btn-primary">Make a plan<ArrowRight size={16} aria-hidden="true" /></Link>
+            <button type="button" className="btn-secondary" onClick={() => setCatchUp(true)}>Do the catch-up version</button>
+          </div>
+          <p className="text-[13.5px] text-muted">The catch-up version has the same questions. It is saved and labelled as a catch-up review.</p>
+        </section>
+      )}
+      {showForm && (prev?.catchUp || (catchUp && !prev)) && <p className="text-[14px] text-muted" data-testid="catchup-label">Catch-up review: answer from the week as you remember it.</p>}
+      {showForm && <form className="card space-y-4" onSubmit={(e) => { e.preventDefault(); saveReview(week, { ...form, rating, catchUp: !practised }); setSaved(true); }}>
         {REVIEW_PROMPTS.map((p) => (
           <div key={p.id}>
             <label htmlFor={`rv-${p.id}`} className="label">{p.label}</label>
@@ -67,8 +82,8 @@ export function Review() {
             ))}
           </div>
         </fieldset>
-        <button type="submit" className="btn-primary">{prev ? 'Save review' : 'Complete review'}</button>
-      </form>
+        <button type="submit" className="btn-primary">{prev ? 'Save review' : catchUp && !practised ? 'Complete catch-up review' : 'Complete review'}</button>
+      </form>}
       {saved && (
         <div className="card">
           <Confirmation focus className="flex items-center gap-2 font-medium text-accent"><Check size={18} aria-hidden="true" />Week {week} review saved</Confirmation>

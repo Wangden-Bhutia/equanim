@@ -6,7 +6,8 @@ import { DAY_TYPES, INTEGRATION_BY_ID, RETRIEVAL_BY_ID, SESSION_BY_ID, type Sess
 import { DOMAINS } from '../../data/domains';
 import { BaselineCompare, EvidenceOfChange, PhraseBankCard, ValuesList } from '../../components/journey';
 import { SCENARIO_BY_ID } from '../../data/scenarios';
-import { currentSessionId, isDone, isUnlocked, latestSnapshot, sessionRoute, weekDayLabel } from '../../engine/programme';
+import { dateKey } from '../../engine/dates';
+import { applyReady, currentSessionId, isDone, isUnlocked, latestSnapshot, sessionRoute, weekDayLabel } from '../../engine/programme';
 import { ChoiceItem, ModeToggle } from '../../components/programme';
 import { DomainTag, PageHeader } from '../../components/ui';
 import { Confirmation } from '../../components/Confirmation';
@@ -66,6 +67,8 @@ export function Session() {
   }
 
   const done = isDone(data, s.id) || justDone;
+  // Day 4 Apply reflects a real plan: Complete stays disabled until one exists this week. Revisits are never blocked.
+  const applyOk = !s.apply || isDone(data, s.id) || applyReady(data, s.week, dateKey());
   const finish = () => { completeSession(s.id, mode, answers, choices); setJustDone(true); };
   const prompt = (p: { id: string; label: string; hint?: string }) => (
     <div key={p.id} className="mt-3">
@@ -124,7 +127,10 @@ export function Session() {
       {s.apply && (
         <Block title="Make it concrete">
           <p className="text-[15.5px]">{s.apply.explain}</p>
-          <Link to="/plan" className="btn-secondary mt-3">Open the if-then builder<ArrowRight size={16} aria-hidden="true" /></Link>
+          {applyOk
+            ? <p className="mt-3 text-[15px] flex gap-2 items-center"><Check size={17} className="text-accent" aria-hidden="true" />You have a plan this week. You can finish the session.</p>
+            : <p className="mt-3 text-[15px] rounded-xl bg-accentsoft px-3 py-2" data-testid="apply-needs-plan">Make today’s plan first. The session finishes once you have one real plan to try.</p>}
+          <Link to={`/plan?from=${s.id}`} className="btn-secondary mt-3">{applyOk ? 'Open the if-then builder' : 'Make today’s plan'}<ArrowRight size={16} aria-hidden="true" /></Link>
         </Block>
       )}
       {s.retrieval && (
@@ -165,7 +171,10 @@ export function Session() {
           </div>
         </div>
       ) : (
-        <button className="btn-primary w-full sm:w-auto" onClick={finish}>Complete session</button>
+        <div className="flex flex-wrap items-center gap-3">
+          <button className="btn-primary w-full sm:w-auto" onClick={finish} disabled={!applyOk}>Complete session</button>
+          {!applyOk && <Link to="/" className="btn-ghost">I’ll do this later</Link>}
+        </div>
       )}
     </article>
     </Paced>
