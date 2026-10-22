@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { DAILY_SHORT } from '../engine/time';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Check, Moon, Pencil, PlayCircle, Sunrise, Timer } from 'lucide-react';
 import { ProgrammeToday } from './programme/ProgrammeToday';
@@ -262,7 +263,7 @@ function ProgrammeOffer() {
   return (
     <section className="card border-accent/40" aria-labelledby="offer-h">
       <p className="eyebrow">New</p>
-      <h2 id="offer-h" className="font-serif text-[21px] font-semibold mt-1">A 6-week programme, about 8 minutes a day</h2>
+      <h2 id="offer-h" className="font-serif text-[21px] font-semibold mt-1">A 6-week programme, {DAILY_SHORT.toLowerCase()}</h2>
       <p className="text-muted text-[15px] mt-1">A guided path through the four skills, one week each, with a short review every week. Your journal, practice history and settings stay exactly as they are.</p>
       <div className="mt-4 flex flex-wrap gap-3">
         <Link to="/values" onClick={() => startProgramme()} className="btn-primary">Start with Day 0<ArrowRight size={16} aria-hidden="true" /></Link>

@@ -1,4 +1,5 @@
 import { DAY0_ID, SESSIONS, SESSION_BY_ID, type SessionDef } from '../data/programme';
+import { SESSION_RANGE } from './time';
 import type { AppData, RecallRecord } from '../types';
 import { addDays, keyFromIso } from './dates';
 import { activityDays } from './progress';
@@ -181,7 +182,7 @@ export function reminderIcs(time: string, startDay: string, now: Date = new Date
     'DURATION:PT10M',
     'RRULE:FREQ=DAILY',
     'SUMMARY:Equanim: today’s session',
-    'DESCRIPTION:About 8 minutes. Open Equanim when you have a moment.',
+    `DESCRIPTION:About ${SESSION_RANGE}. Open Equanim when you have a moment.`,
     'BEGIN:VALARM', 'ACTION:DISPLAY', 'TRIGGER:PT0M', 'DESCRIPTION:Equanim: today’s session', 'END:VALARM',
     'END:VEVENT', 'END:VCALENDAR',
   ];

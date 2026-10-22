@@ -6,6 +6,7 @@ import { STORE_KEY } from '../../src/storage/storage';
 import { emptyData } from '../../src/storage/schema';
 import { addDays, dateKey } from '../../src/engine/dates';
 import { BASELINE_ITEMS, DIDNT_MANAGE_RESPONSE } from '../../src/data/programme';
+import { DAILY_SHORT } from '../../src/engine/time';
 import type { AppData } from '../../src/types';
 
 const now = () => new Date().toISOString();
@@ -28,7 +29,7 @@ describe('onboarding: welcome → Day 0', () => {
     render(<App />);
     expect(await screen.findByRole('heading', { level: 1, name: /respond, rather than react/i })).toBeInTheDocument();
     expect(screen.getByText('6 weeks')).toBeInTheDocument();
-    expect(screen.getByText('About 8 min a day')).toBeInTheDocument();
+    expect(screen.getByText(DAILY_SHORT)).toBeInTheDocument();
     expect(screen.getByText(/Private on your device/)).toBeInTheDocument();
     expect(screen.getByText(/Tele-MANAS 14416 or 1-800-891-4416/)).toBeInTheDocument();
     expect(screen.queryByText(/Sample journey/)).not.toBeInTheDocument();

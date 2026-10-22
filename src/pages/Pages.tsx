@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { DAILY_TIME, EVENING_MINUTES, PLAN_MINUTES, REVIEW_TIME, SESSION_RANGE, cap } from '../engine/time';
 import { ChevronRight } from 'lucide-react';
 import { DOMAIN_LIST } from '../data/domains';
 import { WEEKS } from '../data/programme';
@@ -38,13 +39,13 @@ export function About() {
   ];
   return (
     <article className="space-y-5">
-      <PageHeader title="About Equanim" back="/more" intro="A six-week, few-minutes-a-day programme for responding to everyday moments with more clarity and less reactivity." />
+      <PageHeader title="About Equanim" back="/more" intro={`A six-week programme for responding to everyday moments with more clarity and less reactivity: ${DAILY_TIME}.`} />
 
       <section aria-labelledby="ab-what" className="prose-eq text-[16px]">
         <h2 id="ab-what" className="font-serif text-[21px] font-semibold mb-2">What it does</h2>
         <p>Equanim helps you notice the moment between something happening and how you respond, and use it a little more often. It does this with short daily sessions, small plans for real moments, and a weekly look back. Everything stays private on your device.</p>
         <h2 className="font-serif text-[21px] font-semibold mt-6 mb-2">Who it is for</h2>
-        <p>Adults who want to take things less personally, check assumptions before acting on them, speak with more care, and keep going without demanding perfection. It suits people who can spare about eight minutes most days. It is not designed for crisis, trauma or clinical conditions.</p>
+        <p>Adults who want to take things less personally, check assumptions before acting on them, speak with more care, and keep going without demanding perfection. It suits people who can spare {DAILY_TIME} most days. It is not designed for crisis, trauma or clinical conditions.</p>
       </section>
 
       <section aria-labelledby="ab-skills">
@@ -78,11 +79,11 @@ export function About() {
       <section aria-labelledby="ab-day" className="card">
         <h2 id="ab-day" className="font-serif text-[21px] font-semibold mb-2">A typical day</h2>
         <ol className="space-y-2 text-[15px] list-decimal pl-5">
-          <li><span className="font-medium">Morning (1 min):</span> make one if-then plan: “When ___, I will ___.”</li>
-          <li><span className="font-medium">Any time (6–10 min):</span> today’s session. Think it through, or write it down.</li>
-          <li><span className="font-medium">Evening (1 min):</span> did the moment come up? What did you do?</li>
+          <li><span className="font-medium">Morning ({PLAN_MINUTES} min):</span> make one if-then plan: “When ___, I will ___.”</li>
+          <li><span className="font-medium">Any time ({SESSION_RANGE}):</span> today’s session. Think it through, or write it down.</li>
+          <li><span className="font-medium">Evening ({EVENING_MINUTES} min):</span> did the moment come up? What did you do?</li>
         </ol>
-        <p className="text-[14px] text-muted mt-2">Day 6 of each week is a 15-minute review; Day 7 is rest. Sessions wait for you: missing a day changes nothing.</p>
+        <p className="text-[14px] text-muted mt-2">{cap(REVIEW_TIME)}; Day 7 is rest. One new session opens each day. Sessions wait for you: missing a day changes nothing.</p>
       </section>
 
       <section aria-labelledby="ab-how" className="prose-eq text-[16px]">

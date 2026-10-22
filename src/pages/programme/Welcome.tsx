@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { DAILY_SHORT } from '../../engine/time';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { CalendarDays, Clock, Lock } from 'lucide-react';
 import { useStore } from '../../app/store';
@@ -41,7 +42,7 @@ export function Welcome() {
         <p className="mt-4 text-[17px] text-muted">A six-week programme of short daily sessions: noticing the meaning you add to events, checking assumptions, speaking with care, and doing your best without demanding perfection.</p>
         <ul className="mt-6 space-y-3 text-[15.5px]" aria-label="At a glance">
           <li className="flex gap-3 items-center"><CalendarDays size={20} className="text-accent shrink-0" aria-hidden="true" />6 weeks</li>
-          <li className="flex gap-3 items-center"><Clock size={20} className="text-accent shrink-0" aria-hidden="true" />About 8 min a day</li>
+          <li className="flex gap-3 items-center"><Clock size={20} className="text-accent shrink-0" aria-hidden="true" />{DAILY_SHORT}</li>
           <li className="flex gap-3 items-center"><Lock size={20} className="text-accent shrink-0" aria-hidden="true" />Private on your device: no account, no tracking</li>
         </ul>
         <p className="mt-6 text-sm text-muted">Day 0 takes about 10 minutes: you choose three values and rate where you are starting from.</p>

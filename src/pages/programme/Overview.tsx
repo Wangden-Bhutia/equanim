@@ -1,4 +1,5 @@
 import { Link, useParams } from 'react-router-dom';
+import { DAILY_TIME, REVIEW_TIME, cap } from '../../engine/time';
 import { Check, ChevronRight, Circle, Lock } from 'lucide-react';
 import { useStore } from '../../app/store';
 import { DAY0_ID, DAY_TYPES, SESSIONS, SESSION_BY_ID, WEEKS } from '../../data/programme';
@@ -18,7 +19,7 @@ export function ProgrammeOverview() {
   const opens = opensOn(data, dateKey());
   return (
     <div>
-      <PageHeader title="The 6-week programme" intro="Six to ten minutes a day, plus a short review each week. Sessions open in order and can be done late; nothing is lost by a gap." />
+      <PageHeader title="The 6-week programme" intro={`${cap(DAILY_TIME)}; ${REVIEW_TIME}. One new session opens each day, and nothing is lost by a gap.`} />
       {data.programme && <div className="mb-6"><ProgrammeChip label={weekDayLabel(cur)} progress={pathProgress(data)} />
         {cur && opens && <p className="text-[14px] text-muted mt-2" data-testid="overview-opens">Next session opens {dayLabel(opens, { weekday: 'long' })}.</p>}</div>}
       <ul className="space-y-3">

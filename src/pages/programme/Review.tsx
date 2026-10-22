@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { REVIEW_SHORT } from '../../engine/time';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowRight, Check, Lock } from 'lucide-react';
 import { useStore } from '../../app/store';
@@ -23,7 +24,7 @@ export function Review() {
   const [saved, setSaved] = useState(false);
   const [catchUp, setCatchUp] = useState(false);
   if (!def || !SESSION_BY_ID[sid]) return <NotFound />;
-  const header = <PageHeader eyebrow={`${weekDayLabel(sid)} · Weekly review · about 15 min`} title={`Week ${week} review: ${def.title}`} back="/" />;
+  const header = <PageHeader eyebrow={`${weekDayLabel(sid)} · Weekly review · ${REVIEW_SHORT}`} title={`Week ${week} review: ${def.title}`} back="/" />;
   if (!SESSION_BY_ID[sid]!.available) return <div>{header}<p className="card">This review arrives in the next update.</p></div>;
   if (!isUnlocked(data, sid)) {
     return <div>{header}<div className="card flex gap-3"><Lock size={20} className="text-muted shrink-0" aria-hidden="true" /><p>The review opens after this week’s other sessions. There is no deadline.</p></div></div>;
