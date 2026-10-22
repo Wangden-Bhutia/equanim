@@ -17,7 +17,7 @@ export function ProgrammeOverview() {
   const opens = opensOn(data, dateKey());
   return (
     <div>
-      <PageHeader title="The 6-week programme" back="/" intro="Six to ten minutes a day, plus a short review each week. Sessions open in order and can be done late; nothing is lost by a gap." />
+      <PageHeader title="The 6-week programme" intro="Six to ten minutes a day, plus a short review each week. Sessions open in order and can be done late; nothing is lost by a gap." />
       {data.programme && <div className="mb-6"><ProgrammeChip label={weekDayLabel(cur)} progress={pathProgress(data)} />
         {cur && opens && <p className="text-[14px] text-muted mt-2" data-testid="overview-opens">Next session opens {dayLabel(opens, { weekday: 'long' })}.</p>}</div>}
       <ul className="space-y-3">
@@ -42,6 +42,10 @@ export function ProgrammeOverview() {
           );
         })}
       </ul>
+      <Link to="/library" className="card !p-4 mt-6 flex items-center gap-3 hover:bg-surface2" data-testid="keep-practising-link">
+        <span className="flex-1"><span className="font-semibold block">Keep practising</span><span className="text-sm text-muted block">Scenarios, readings and phrases, any time, outside the daily session.</span></span>
+        <ChevronRight size={20} aria-hidden="true" />
+      </Link>
     </div>
   );
 }

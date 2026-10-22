@@ -6,6 +6,7 @@ import { DOMAIN_TEXT, WeekMotif } from '../components/journey';
 import { SECONDARY_NAV } from '../components/nav';
 import { PageHeader } from '../components/ui';
 import { InstallApp } from '../components/InstallApp';
+import { SafetyFooter } from '../components/programme';
 
 export function More() {
   return (
@@ -23,6 +24,7 @@ export function More() {
         ))}
       </ul>
       <section className="mt-6" aria-label="Install App"><InstallApp variant="row" /></section>
+      <SafetyFooter className="mt-6 text-center" />
       <p className="text-center text-xs text-muted mt-8">Equanim 1.2 · Clarity in the midst of life.</p>
     </div>
   );

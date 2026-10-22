@@ -55,6 +55,7 @@ function MaintenanceCard() {
           {scenario && <li><Link to={`/practise/${scenario.id}`} className="flex items-center gap-3 rounded-xl border border-line px-3 min-h-[48px]"><PlayCircle size={18} className="text-accent" aria-hidden="true" /><span className="flex-1">Scenario: {scenario.title}</span><ArrowRight size={16} aria-hidden="true" /></Link></li>}
           <li><Link to={`/phrases#${bank.id}`} className="flex items-center gap-3 rounded-xl border border-line px-3 min-h-[48px]"><MessageCircle size={18} className="text-accent" aria-hidden="true" /><span className="flex-1">Phrases: {bank.title}</span><ArrowRight size={16} aria-hidden="true" /></Link></li>
           <li><Link to="/programme" className="flex items-center gap-3 rounded-xl border border-line px-3 min-h-[48px]"><RotateCcw size={18} className="text-accent" aria-hidden="true" /><span className="flex-1">Repeat a week of the programme</span><ArrowRight size={16} aria-hidden="true" /></Link></li>
+          <li><Link to="/library" className="flex items-center gap-3 rounded-xl border border-line px-3 min-h-[48px]"><NotebookPen size={18} className="text-accent" aria-hidden="true" /><span className="flex-1">Keep practising: everything else</span><ArrowRight size={16} aria-hidden="true" /></Link></li>
         </ul>
       </section>
     </div>
