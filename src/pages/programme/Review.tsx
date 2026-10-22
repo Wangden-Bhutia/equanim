@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowRight, Check, Lock } from 'lucide-react';
 import { useStore } from '../../app/store';
-import { OUTCOME_LABELS, REVIEW_PROMPTS, RATING_LABELS, SESSION_BY_ID, WEEKS } from '../../data/programme';
+import { OUTCOME_LABELS, REVIEW_PROMPTS, RATING_LABELS, SESSION_BY_ID, VALUE_BY_ID, WEEKS } from '../../data/programme';
 import { dateKey } from '../../engine/dates';
 import { isUnlocked, plansThisWeek, weekDayLabel, weekHasPractice } from '../../engine/programme';
 import { PageHeader } from '../../components/ui';
 import { Confirmation } from '../../components/Confirmation';
 import { NotFound } from '../NotFound';
 import { Paced } from '../../components/pacing';
+import { ValuesCollapsed } from '../../components/journey';
 
 export function Review() {
   const { week: w = '' } = useParams();
@@ -32,6 +33,9 @@ export function Review() {
   const plans = plansThisWeek(data, week, today);
   const practised = weekHasPractice(data, week, today);
   const showForm = !!prev || practised || catchUp;
+  const servedMap = new Map<string, number>();
+  plans.forEach((p) => { if (p.valueId) servedMap.set(p.valueId, (servedMap.get(p.valueId) ?? 0) + 1); });
+  const served = [...servedMap.entries()];
   const counts = { 'not-came-up': 0, tried: 0, 'didnt-manage': 0 } as Record<keyof typeof OUTCOME_LABELS, number>;
   plans.forEach((p) => { if (p.outcome) counts[p.outcome] += 1; });
 
@@ -50,6 +54,13 @@ export function Review() {
           </>
         )}
       </section>
+      <section className="card" aria-labelledby="rv-values">
+        <h2 id="rv-values" className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted mb-2">Which values did your plans serve this week?</h2>
+        {served.length === 0
+          ? <p className="text-muted text-[15px]">{plans.length ? 'None of this week’s plans named a value. You can add one in the plan builder any time.' : 'No plans this week yet.'}</p>
+          : <ul className="text-[15px] space-y-1" data-testid="review-values">{served.map(([id, n]) => <li key={id}><span className="font-semibold">{VALUE_BY_ID[id] ?? id}</span>: {n} {n === 1 ? 'plan' : 'plans'}</li>)}</ul>}
+      </section>
+      <ValuesCollapsed data={data} />
       {!showForm && (
         <section className="card space-y-3" aria-labelledby="rv-catch" data-testid="review-needs-practice">
           <h2 id="rv-catch" className="font-serif text-[19px] font-semibold">The review works best after a real-life try</h2>

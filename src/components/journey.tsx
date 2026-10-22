@@ -125,6 +125,19 @@ export function ValuesList({ data, title = 'Your values' }: { data: AppData; tit
   );
 }
 
+/** "Your values", collapsed by default (Day 4 Apply and the weekly review). A link to /values when none were chosen. */
+export function ValuesCollapsed({ data }: { data: AppData }) {
+  if (data.values.length === 0) return <p className="text-[14.5px] text-muted">You have not chosen your values yet. <Link to="/values" className="underline underline-offset-2 text-accent">Choose them now</Link> (about three minutes).</p>;
+  return (
+    <details className="card !p-0 group" data-testid="values-collapsed">
+      <summary className="cursor-pointer list-none px-5 min-h-[48px] flex items-center justify-between font-semibold text-[15px]">Your values<span className="text-muted text-[13px] font-normal group-open:hidden">Show</span></summary>
+      <ul className="px-5 pb-4 space-y-2">
+        {data.values.map((v) => <li key={v.id}><span className="font-semibold">{VALUE_BY_ID[v.id] ?? v.id}. </span><span className="text-[15px]">{v.sentence}</span></li>)}
+      </ul>
+    </details>
+  );
+}
+
 export function PhraseBankCard({ id }: { id: string }) {
   const b = PHRASE_BANK_BY_ID[id];
   if (!b) return null;

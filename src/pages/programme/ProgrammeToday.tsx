@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ArrowRight, Check, ChevronDown, CloudDownload, MessageCircle, Moon, NotebookPen, PlayCircle, RotateCcw, Sunrise } from 'lucide-react';
 import { useStore } from '../../app/store';
-import { PHRASE_BANKS, DAY0_ID, DAY_TYPES, DIDNT_MANAGE_RESPONSE, EVENING_QUESTION, INDEPENDENCE_TEXT, OUTCOME_LABELS, RETRIEVAL_BY_ID, SESSION_BY_ID } from '../../data/programme';
+import { PHRASE_BANKS, DAY0_ID, DAY_TYPES, DIDNT_MANAGE_RESPONSE, EVENING_QUESTION, INDEPENDENCE_TEXT, OUTCOME_LABELS, RETRIEVAL_BY_ID, SESSION_BY_ID, VALUE_BY_ID } from '../../data/programme';
 import { dateKey, formatLongDate, keyFromIso } from '../../engine/dates';
 import { MAINTENANCE_PER_WEEK, checkinDue, currentSessionId, daysPractisedThisWeek, dueRecall, inMaintenance, isReturning, opensOn, pathProgress, sessionRoute, shouldNudgeBackup, weekDayLabel } from '../../engine/programme';
 import { SCENARIO_BY_ID } from '../../data/scenarios';
@@ -166,6 +166,7 @@ function EveningCheck() {
         <div>
           <p className="text-[13px] text-muted">This morning’s plan</p>
           <p className="font-serif text-[18px] leading-snug mt-0.5">When {plan.when}, I will {plan.then}.</p>
+          {plan.valueId && <p className="text-[14.5px] mt-1" data-testid="plan-value">You planned this for <em className="font-semibold not-italic text-accent">{VALUE_BY_ID[plan.valueId] ?? plan.valueId}</em>.</p>}
           {!editing && plan.outcome ? (
             <div className="mt-3">
               <Confirmation focus={justSaved} className="flex items-center gap-2 font-medium text-accent"><Check size={18} aria-hidden="true" />{OUTCOME_LABELS[plan.outcome]}</Confirmation>

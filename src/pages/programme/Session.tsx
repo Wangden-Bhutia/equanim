@@ -4,7 +4,7 @@ import { ArrowRight, Check, Lock } from 'lucide-react';
 import { useStore } from '../../app/store';
 import { DAY_TYPES, MICRO_CHECKS, THINK_RESPONSES, INTEGRATION_BY_ID, RETRIEVAL_BY_ID, SESSION_BY_ID, type SessionDef } from '../../data/programme';
 import { DOMAINS } from '../../data/domains';
-import { BaselineCompare, EvidenceOfChange, PhraseBankCard, ValuesList } from '../../components/journey';
+import { BaselineCompare, EvidenceOfChange, PhraseBankCard, ValuesCollapsed, ValuesList } from '../../components/journey';
 import { SCENARIO_BY_ID } from '../../data/scenarios';
 import { dateKey } from '../../engine/dates';
 import { applyReady, currentSessionId, isDone, isUnlocked, latestSnapshot, sessionRoute, weekDayLabel } from '../../engine/programme';
@@ -146,6 +146,7 @@ export function Session() {
           </div>
         ) : null;
       })}
+      {s.apply && <ValuesCollapsed data={data} />}
       {s.apply && (
         <Block title="Make it concrete">
           <p className="text-[15.5px]">{s.apply.explain}</p>
