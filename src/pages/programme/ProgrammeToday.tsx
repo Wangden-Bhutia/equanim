@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ArrowRight, Check, ChevronDown, Info, CloudDownload, MessageCircle, Moon, NotebookPen, PlayCircle, RotateCcw, Sunrise } from 'lucide-react';
 import { useStore } from '../../app/store';
@@ -245,7 +245,20 @@ function IndependenceNotice() {
   );
 }
 
+/** Re-renders when the local date changes (an app left open overnight), so "Opens tomorrow" turns into today's session. */
+function useDayChange() {
+  const [, setDay] = useState(() => dateKey());
+  useEffect(() => {
+    const tick = () => setDay((prev) => { const k = dateKey(); return k === prev ? prev : k; });
+    const id = window.setInterval(tick, 30000);
+    document.addEventListener('visibilitychange', tick);
+    window.addEventListener('focus', tick);
+    return () => { window.clearInterval(id); document.removeEventListener('visibilitychange', tick); window.removeEventListener('focus', tick); };
+  }, []);
+}
+
 export function ProgrammeToday() {
+  useDayChange();
   const { data } = useStore();
   const loc = useLocation();
   const now = new Date();

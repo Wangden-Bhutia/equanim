@@ -35,7 +35,7 @@ export function Baseline() {
     if (!ready) return;
     saveBaseline(kind, ratings, situations);
     if (kind === 'start') navigate('/', { state: { completed: 'w0d0' } });
-    else if (kind === 'finish') navigate('/session/w6d2');
+    else if (kind === 'finish') navigate('/');
     else navigate('/progress');
   };
   const body = (
