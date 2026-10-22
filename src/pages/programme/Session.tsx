@@ -8,7 +8,9 @@ import { BaselineCompare, EvidenceOfChange, PhraseBankCard, ValuesCollapsed, Val
 import { SCENARIO_BY_ID } from '../../data/scenarios';
 import { dateKey } from '../../engine/dates';
 import { applyReady, currentSessionId, isDone, isUnlocked, latestSnapshot, sessionRoute, weekDayLabel } from '../../engine/programme';
-import { ChoiceItem, ModeToggle } from '../../components/programme';
+import { ChoiceItem, ModeToggle, SessionMark } from '../../components/programme';
+import { CompletionMoment } from '../../components/moment';
+import { momentLine } from '../../data/programme/moments';
 import { DomainTag, PageHeader } from '../../components/ui';
 import { Confirmation } from '../../components/Confirmation';
 import { NotFound } from '../NotFound';
@@ -39,6 +41,8 @@ export function Session() {
   const [think, setThink] = useState<Record<string, string>>(prev?.thinkResponses ?? {});
   const [justDone, setJustDone] = useState(false);
   const [doneAtStart] = useState(!!prev);
+  // Which line of the pool to show: the count of earlier completed sessions of the same type, so lines never repeat back to back.
+  const [nth] = useState(() => data.sessions.filter((x) => x.sessionId !== id && SESSION_BY_ID[x.sessionId]?.type === SESSION_BY_ID[id]?.type).length);
   if (!s) return <NotFound />;
   if (s.special === 'baseline-finish') return <Navigate to="/baseline/finish" replace />;
   const onboarded = !!data.onboardingCompletedAt;
@@ -100,16 +104,21 @@ export function Session() {
   return (
     <Paced sessionId={s.id} title={<PageHeader eyebrow={eyebrow} title={s.title} back="/" />}>
     <article className="space-y-4">
+      <SessionMark type={s.type} domain={s.domain} />
       <PageHeader eyebrow={eyebrow} title={s.title} back={onboarded ? '/' : '/welcome'} intro={s.intro} />
       {s.domain && <DomainTag domain={s.domain} />}
       <ModeToggle mode={mode} onChange={setMode} />
       <p className="text-[13px] text-muted">{mode === 'think' ? 'Read, pause, then tap the answer that fits. Nothing needs to be typed.' : 'Your answers are kept privately with this session on this device.'}</p>
 
       {s.lesson && (
-        <Block title="The idea">
-          {s.lesson.body.map((p) => <p key={p} className="text-[16px] mt-2 first:mt-0">{p}</p>)}
-          <p className="mt-3 rounded-xl bg-surface2/70 p-3 text-[15px]"><span className="font-semibold">Example: </span>{s.lesson.example}</p>
-        </Block>
+        <>
+          <Block title="The idea">
+            {s.lesson.body.map((p) => <p key={p} className="text-[16px] leading-relaxed mt-3 first:mt-0">{p}</p>)}
+          </Block>
+          <Block title="An example">
+            <p className="text-[16px] leading-relaxed">{s.lesson.example}</p>
+          </Block>
+        </>
       )}
       {checks.map((c) => (
         <section key={c.id} aria-label="Quick check" className="space-y-1.5">
@@ -131,11 +140,11 @@ export function Session() {
       {s.special === 'evidence' && <Block title="From your own notes"><EvidenceOfChange data={data} /></Block>}
       {s.special === 'maintenance' && (
         <Block title="What maintenance looks like">
-          <p className="text-[15.5px]">After Week 6, Today switches to a lighter rhythm: about three short sessions a week from Keep practising, a monthly check-in with the same statements, and the option to repeat any week whenever you like.</p>
+          <p className="text-[16px] leading-relaxed">After Week 6, Today switches to a lighter rhythm: about three short sessions a week from Keep practising, a monthly check-in with the same statements, and the option to repeat any week whenever you like.</p>
         </Block>
       )}
       {s.banks && s.banks.map((b) => <PhraseBankCard key={b} id={b} />)}
-      {s.banks && s.rehearse && <p className="text-[15px]">{s.rehearse}</p>}
+      {s.banks && s.rehearse && <p className="text-[16px] leading-relaxed">{s.rehearse}</p>}
       {s.integration?.map((xid) => {
         const x = INTEGRATION_BY_ID[xid];
         return x ? (
@@ -149,7 +158,7 @@ export function Session() {
       {s.apply && <ValuesCollapsed data={data} />}
       {s.apply && (
         <Block title="Make it concrete">
-          <p className="text-[15.5px]">{s.apply.explain}</p>
+          <p className="text-[16px] leading-relaxed">{s.apply.explain}</p>
           {applyOk
             ? <p className="mt-3 text-[15px] flex gap-2 items-center"><Check size={17} className="text-accent" aria-hidden="true" />You have a plan this week. You can finish the session.</p>
             : <p className="mt-3 text-[15px] rounded-xl bg-accentsoft px-3 py-2" data-testid="apply-needs-plan">Make today’s plan first. The session finishes once you have one real plan to try.</p>}
@@ -176,14 +185,16 @@ export function Session() {
       {s.prompts && s.prompts.length > 0 && <Block title={mode === 'write' ? 'Write it down' : 'Think it through'}>{s.prompts.map(prompt)}</Block>}
       {s.notThis && (
         <aside className="card !p-4 bg-surface2/60" aria-label="What this is not">
-          <p className="text-[14.5px]"><span className="font-semibold">Not this: </span>{s.notThis}</p>
+          <p className="text-[16px] leading-relaxed"><span className="font-semibold">Not this: </span>{s.notThis}</p>
         </aside>
       )}
 
       {done ? (
         <div className={`card ${justDone ? 'completion-moment' : ''}`}>
-          <Confirmation focus={justDone} className="flex items-center gap-2 font-medium text-accent"><Check size={18} aria-hidden="true" />{doneAtStart && !justDone ? 'Completed. You can revisit it any time.' : 'Session complete'}</Confirmation>
-          {justDone && !doneAtStart && !isTaster && <p className="text-muted text-[15px] mt-2">Nice work. The next session opens tomorrow, and any day after that is fine too.</p>}
+          {justDone && !doneAtStart
+            ? <CompletionMoment title="Session complete" line={momentLine(s.type, nth)} />
+            : <Confirmation focus={justDone} className="flex items-center gap-2 font-medium text-accent"><Check size={18} aria-hidden="true" />{doneAtStart && !justDone ? 'Completed. You can revisit it any time.' : 'Session complete'}</Confirmation>}
+          {justDone && !doneAtStart && !isTaster && <p className="text-muted text-[15px] mt-2">The next session opens tomorrow, and any day after that is fine too.</p>}
           {doneAtStart && justDone && <p className="text-muted text-[15px] mt-2">Your changes were saved.</p>}
           <div className="mt-4 flex flex-wrap gap-3">
             {isTaster && !onboarded ? <Link to="/welcome" className="btn-primary">Back to the welcome<ArrowRight size={16} aria-hidden="true" /></Link>

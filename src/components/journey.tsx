@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Check, Focus, Footprints, MessageCircle, Puzzle, Search, Sunrise, type LucideIcon } from 'lucide-react';
-import { BASELINE_ITEMS, RATING_LABELS, VALUE_BY_ID, WEEKS, PHRASE_BANK_BY_ID } from '../data/programme';
+import { BASELINE_ITEMS, RATING_LABELS, SESSIONS, VALUE_BY_ID, WEEKS, PHRASE_BANK_BY_ID } from '../data/programme';
 import { DOMAINS } from '../data/domains';
 import { formatShort } from '../engine/dates';
 import { OUTCOME_LABELS } from '../data/programme';
@@ -14,10 +14,10 @@ export const WEEK_MOTIFS: Record<number, LucideIcon> = { 1: Focus, 2: Search, 3:
 export const DOMAIN_TEXT: Record<DomainId, string> = {
   personalisation: 'text-personalisation', inquiry: 'text-inquiry', speech: 'text-speech', effort: 'text-effort',
 };
-const DOMAIN_BORDER: Record<DomainId, string> = {
+export const DOMAIN_BORDER: Record<DomainId, string> = {
   personalisation: 'border-personalisation', inquiry: 'border-inquiry', speech: 'border-speech', effort: 'border-effort',
 };
-const DOMAIN_BG: Record<DomainId, string> = {
+export const DOMAIN_BG: Record<DomainId, string> = {
   personalisation: 'bg-personalisation', inquiry: 'bg-inquiry', speech: 'bg-speech', effort: 'bg-effort',
 };
 
@@ -27,31 +27,47 @@ export function WeekMotif({ week, size = 20, className = '' }: { week: number; s
   return <Icon size={size} aria-hidden="true" className={`${d ? DOMAIN_TEXT[d] : 'text-accent'} ${className}`} />;
 }
 
-/** Six nodes, one per week. Done weeks show a check; the current week has a ring. Each node opens its week. */
+/** Short skill names for the journey map labels. */
+export const WEEK_SKILL: Record<number, string> = { 1: 'Personal', 2: 'Inquiry', 3: 'Speech', 4: 'Effort', 5: 'Together', 6: 'Keep going' };
+
+/**
+ * Six connected nodes along a gentle path, one per week. Filled for completed weeks, ringed for the current week,
+ * outlined for weeks ahead, each in its week's skill colour (Weeks 5 and 6 use the accent). Each node opens its week
+ * and is described in full to screen readers, e.g. "Week 2 of 6, Inquiry, 3 of 6 sessions done, current week".
+ */
 export function JourneyMap({ data }: { data: AppData }) {
   const statuses: WeekStatus[] = weekStatuses(data);
+  // Node centres on a 600 × 64 canvas: evenly spaced, gently alternating height.
+  const pts = WEEKS.map((_, i) => ({ x: 50 + i * 100, y: i % 2 === 0 ? 22 : 42 }));
+  const path = pts.map((p, i) => (i === 0 ? `M${p.x} ${p.y}` : `C${pts[i - 1]!.x + 50} ${pts[i - 1]!.y} ${p.x - 50} ${p.y} ${p.x} ${p.y}`)).join(' ');
   return (
     <nav aria-label="Your six-week journey">
-      <ol className="relative grid grid-cols-6 gap-1">
-        <span aria-hidden="true" className="absolute left-[8%] right-[8%] top-[22px] h-0.5 bg-line" />
-        {WEEKS.map((w, i) => {
-          const st = statuses[i] ?? 'upcoming';
-          const d = w.domain;
-          const ring = st === 'current' ? `border-2 ${d ? DOMAIN_BORDER[d] : 'border-accent'} bg-surface` : st === 'done' ? 'border border-line bg-accentsoft' : 'border border-line bg-surface';
-          const label = `Week ${w.week}, ${w.title}: ${st === 'done' ? 'done' : st === 'current' ? 'you are here' : 'ahead'}`;
-          return (
-            <li key={w.week} className="relative flex flex-col items-center text-center">
-              <Link to={`/programme/week/${w.week}`} aria-label={label} aria-current={st === 'current' ? 'step' : undefined}
-                className={`relative z-10 flex items-center justify-center w-11 h-11 rounded-full ${ring} ${st === 'upcoming' ? 'opacity-70' : ''}`}>
-                <WeekMotif week={w.week} size={19} />
-                {st === 'done' && <span className="absolute -right-1 -bottom-1 w-5 h-5 rounded-full bg-accent text-onaccent flex items-center justify-center"><Check size={12} aria-hidden="true" /></span>}
-              </Link>
-              <span className="mt-1.5 text-[11.5px] font-semibold text-ink" aria-hidden="true">Wk {w.week}</span>
-              <span className="text-[10.5px] leading-tight text-muted hidden sm:block" aria-hidden="true">{w.title.replace(/^(Freedom from|The Discipline of|Integrity of|Sincere) /, '')}</span>
-            </li>
-          );
-        })}
-      </ol>
+      <div className="relative">
+        <svg viewBox="0 0 600 64" preserveAspectRatio="none" className="absolute inset-x-0 top-0 w-full h-16 text-line" aria-hidden="true" focusable="false">
+          <path d={path} fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+        </svg>
+        <ol className="relative grid grid-cols-6">
+          {WEEKS.map((w, i) => {
+            const st = statuses[i] ?? 'upcoming';
+            const d = w.domain;
+            const ss = SESSIONS.filter((s) => s.week === w.week);
+            const n = ss.filter((s) => data.sessions.some((x) => x.sessionId === s.id)).length;
+            const fill = d ? DOMAIN_BG[d] : 'bg-accent';
+            const ring = d ? DOMAIN_BORDER[d] : 'border-accent';
+            const cls = st === 'done' ? `${fill} border-2 ${ring}` : st === 'current' ? `bg-surface border-[3px] ${ring} ring-4 ring-accentsoft` : `bg-surface border-2 border-line`;
+            const label = `Week ${w.week} of 6, ${w.title}, ${n} of ${ss.length} sessions done${st === 'current' ? ', current week' : st === 'done' ? ', complete' : ''}`;
+            return (
+              <li key={w.week} className="flex flex-col items-center text-center" style={{ paddingTop: `${pts[i]!.y - 18}px` }}>
+                <Link to={`/programme/week/${w.week}`} aria-label={label} aria-current={st === 'current' ? 'step' : undefined}
+                  className={`flex items-center justify-center w-9 h-9 rounded-full ${cls}`} data-status={st}>
+                  {st === 'done' ? <Check size={16} strokeWidth={3} className={d ? 'text-surface' : 'text-onaccent'} aria-hidden="true" /> : <WeekMotif week={w.week} size={16} />}
+                </Link>
+                <span className={`mt-1 text-[11px] leading-tight ${st === 'current' ? 'font-semibold text-ink' : 'text-muted'}`} aria-hidden="true">{WEEK_SKILL[w.week]}</span>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
     </nav>
   );
 }

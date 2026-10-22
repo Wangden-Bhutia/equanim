@@ -3,7 +3,7 @@ import { DAILY_TIME, REVIEW_TIME, cap } from '../../engine/time';
 import { Check, ChevronRight, Circle, Lock } from 'lucide-react';
 import { useStore } from '../../app/store';
 import { DAY0_ID, DAY_TYPES, SESSIONS, SESSION_BY_ID, WEEKS } from '../../data/programme';
-import { BaselineCompare, EvidenceOfChange, ValuesList, WeekMotif } from '../../components/journey';
+import { BaselineCompare, EvidenceOfChange, JourneyMap, ValuesList, WeekMotif } from '../../components/journey';
 import { dateKey } from '../../engine/dates';
 import { earlyLine } from '../Progress';
 import { currentSessionId, dayLabel, earlyCount, opensOn, inMaintenance, isDone, isUnlocked, latestSnapshot, pathProgress, sessionRoute, weekDayLabel } from '../../engine/programme';
@@ -21,6 +21,7 @@ export function ProgrammeOverview() {
     <div>
       <PageHeader title="The 6-week programme" intro={`${cap(DAILY_TIME)}; ${REVIEW_TIME}. One new session opens each day, and nothing is lost by a gap.`} />
       {data.programme && <div className="mb-6"><ProgrammeChip label={weekDayLabel(cur)} progress={pathProgress(data)} />
+        <div className="card mt-4"><JourneyMap data={data} /></div>
         {cur && opens && <p className="text-[14px] text-muted mt-2" data-testid="overview-opens">Next session opens {dayLabel(opens, { weekday: 'long' })}.</p>}</div>}
       <ul className="space-y-3">
         <li>

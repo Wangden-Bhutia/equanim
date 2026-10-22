@@ -104,7 +104,9 @@ describe('Progress, Evidence, About and Phrases', () => {
     go('#/progress');
     const map = await screen.findByRole('navigation', { name: 'Your six-week journey' });
     expect(within(map).getAllByRole('link')).toHaveLength(6);
-    expect(within(map).getByRole('link', { name: /Week 3.*you are here/ })).toHaveAttribute('aria-current', 'step');
+    expect(within(map).getByRole('link', { name: /Week 3 of 6, .*, 0 of 6 sessions done, current week/ })).toHaveAttribute('aria-current', 'step');
+    expect(within(map).getByRole('link', { name: /Week 1 of 6, .*, 6 of 6 sessions done, complete/ })).toHaveAttribute('data-status', 'done');
+    expect(within(map).getByRole('link', { name: /Week 5 of 6, Integration, 0 of 6 sessions done$/ })).toHaveAttribute('data-status', 'upcoming');
     expect(screen.getByText(/practised this week/)).toBeInTheDocument();
     expect(screen.getByText('Pausing first')).toBeInTheDocument();
     expect(screen.getByText(/You will see it side by side with Week 6/)).toBeInTheDocument();

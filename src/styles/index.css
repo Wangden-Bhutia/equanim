@@ -111,3 +111,12 @@ input[type="time"].field:focus, input[type="time"].field:focus-within, input[typ
   .completion-moment { animation: eq-settle 600ms ease-out both; }
   @keyframes eq-settle { from { opacity: 0; transform: translateY(6px) scale(0.98); } to { opacity: 1; transform: none; } }
 }
+
+/* Completion check draws in (≤600 ms). With reduced motion the icon is not shown at all: text only. */
+@media (prefers-reduced-motion: no-preference) {
+  .check-draw path, .check-draw polyline { stroke-dasharray: 30; stroke-dashoffset: 30; animation: eq-draw 450ms 120ms ease-out forwards; }
+  @keyframes eq-draw { to { stroke-dashoffset: 0; } }
+}
+@media (prefers-reduced-motion: reduce) {
+  .moment-icon { display: none; }
+}

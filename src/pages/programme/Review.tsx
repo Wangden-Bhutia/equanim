@@ -1,15 +1,17 @@
 import { useState } from 'react';
 import { REVIEW_SHORT } from '../../engine/time';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowRight, Check, Lock } from 'lucide-react';
+import { ArrowRight, Lock } from 'lucide-react';
 import { useStore } from '../../app/store';
 import { OUTCOME_LABELS, REVIEW_PROMPTS, RATING_LABELS, SESSION_BY_ID, VALUE_BY_ID, WEEKS } from '../../data/programme';
 import { dateKey } from '../../engine/dates';
 import { isUnlocked, plansThisWeek, weekDayLabel, weekHasPractice } from '../../engine/programme';
 import { PageHeader } from '../../components/ui';
-import { Confirmation } from '../../components/Confirmation';
 import { NotFound } from '../NotFound';
 import { Paced } from '../../components/pacing';
+import { CompletionMoment } from '../../components/moment';
+import { momentLine } from '../../data/programme/moments';
+import { SessionMark } from '../../components/programme';
 import { ValuesCollapsed } from '../../components/journey';
 
 export function Review() {
@@ -43,6 +45,7 @@ export function Review() {
   return (
     <Paced sessionId={sid} title={header}>
     <div className="space-y-4">
+      <SessionMark type="review" domain={def.domain} />
       {header}
       <section className="card" aria-labelledby="rv-plans">
         <h2 id="rv-plans" className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted mb-2">This week’s plans</h2>
@@ -98,9 +101,11 @@ export function Review() {
       </form>}
       {saved && (
         <div className="card">
-          <Confirmation focus className="flex items-center gap-2 font-medium text-accent"><Check size={18} aria-hidden="true" />Week {week} review saved</Confirmation>
-          <p className="text-muted text-[15px] mt-2">Tomorrow is a rest day: no session. Keep your plan going if you like.</p>
-          <Link to="/" className="btn-primary mt-3">Back to Today<ArrowRight size={16} aria-hidden="true" /></Link>
+          <CompletionMoment large title={week === 6 ? 'Six weeks complete' : `Week ${week} review saved`}
+            line={week === 6 ? 'That’s the whole path walked. What you keep using is yours.' : momentLine('review', 0)}
+            idea={week === 6 ? 'Notice what was added, check it, say what is true and needed, and do what today allows.' : `This week: ${def.summary.charAt(0).toLowerCase()}${def.summary.slice(1)}`} />
+          <p className="text-muted text-[15px] mt-3">{week === 6 ? 'See your six weeks side by side, then choose a lighter rhythm.' : 'Tomorrow is a rest day: no session. Keep your plan going if you like.'}</p>
+          <Link to={week === 6 ? '/finish' : '/'} className="btn-primary mt-3">{week === 6 ? 'See your six weeks' : 'Back to Today'}<ArrowRight size={16} aria-hidden="true" /></Link>
         </div>
       )}
     </div>
