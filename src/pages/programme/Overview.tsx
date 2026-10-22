@@ -4,7 +4,8 @@ import { useStore } from '../../app/store';
 import { DAY0_ID, DAY_TYPES, SESSIONS, SESSION_BY_ID, WEEKS } from '../../data/programme';
 import { BaselineCompare, EvidenceOfChange, ValuesList, WeekMotif } from '../../components/journey';
 import { dateKey } from '../../engine/dates';
-import { currentSessionId, dayLabel, opensOn, inMaintenance, isDone, isUnlocked, latestSnapshot, pathProgress, sessionRoute, weekDayLabel } from '../../engine/programme';
+import { earlyLine } from '../Progress';
+import { currentSessionId, dayLabel, earlyCount, opensOn, inMaintenance, isDone, isUnlocked, latestSnapshot, pathProgress, sessionRoute, weekDayLabel } from '../../engine/programme';
 
 const MAINTENANCE_PROMPTS = SESSION_BY_ID.w6d5?.prompts ?? [];
 import { PageHeader } from '../../components/ui';
@@ -99,6 +100,7 @@ export function Finish() {
     <div className="space-y-4">
       <PageHeader eyebrow="Week 6" title="Your six weeks" back="/"
         intro={cur === null ? 'You have completed the programme. Here is what you recorded, side by side and in your own words.' : 'This page fills in as you reach Week 6. Here is what you have recorded so far.'} />
+      {earlyLine(earlyCount(data)) && <p className="text-[14.5px] text-muted" data-testid="finish-early">{earlyLine(earlyCount(data))}</p>}
       <section className="card" aria-labelledby="fin-cmp">
         <h2 id="fin-cmp" className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted mb-2">Day 0 and Week 6, side by side</h2>
         {now ? <BaselineCompare start={start} now={now} nowLabel={now.kind === 'checkin' ? 'Check-in' : 'Week 6'} />

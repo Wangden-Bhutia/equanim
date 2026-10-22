@@ -5,7 +5,7 @@ import { DOMAINS } from '../data/domains';
 import { formatShort } from '../engine/dates';
 import { OUTCOME_LABELS } from '../data/programme';
 import type { AppData, Baseline, DomainId } from '../types';
-import type { WeekStatus } from '../engine/programme';
+import { weekStatuses, type WeekStatus } from '../engine/programme';
 
 /** A small motif for each week: a lens, a question, a voice, steps, pieces fitting, a new morning. */
 export const WEEK_MOTIFS: Record<number, LucideIcon> = { 1: Focus, 2: Search, 3: MessageCircle, 4: Footprints, 5: Puzzle, 6: Sunrise };
@@ -28,7 +28,8 @@ export function WeekMotif({ week, size = 20, className = '' }: { week: number; s
 }
 
 /** Six nodes, one per week. Done weeks show a check; the current week has a ring. Each node opens its week. */
-export function JourneyMap({ statuses }: { statuses: WeekStatus[] }) {
+export function JourneyMap({ data }: { data: AppData }) {
+  const statuses: WeekStatus[] = weekStatuses(data);
   return (
     <nav aria-label="Your six-week journey">
       <ol className="relative grid grid-cols-6 gap-1">
