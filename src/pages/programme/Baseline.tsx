@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useStore } from '../../app/store';
 import { dateKey } from '../../engine/dates';
 import { isUnlocked } from '../../engine/programme';
+import { Paced } from '../../components/pacing';
 import { NotFound } from '../NotFound';
 import { BASELINE_ITEMS, BASELINE_SITUATIONS, RATING_LABELS } from '../../data/programme';
 import { PageHeader } from '../../components/ui';
@@ -34,10 +35,10 @@ export function Baseline() {
     if (!ready) return;
     saveBaseline(kind, ratings, situations);
     if (kind === 'start') navigate('/', { state: { completed: 'w0d0' } });
-    else if (kind === 'finish') navigate('/session/w6d2');
+    else if (kind === 'finish') navigate('/');
     else navigate('/progress');
   };
-  return (
+  const body = (
     <div>
       <PageHeader eyebrow={c.eyebrow} title={c.title} back={c.back}
         intro={<>{c.lead} <strong className="text-ink font-semibold">It is not a validated test</strong> and says nothing about you as a person.</>} />
@@ -70,4 +71,5 @@ export function Baseline() {
       <p className="text-sm text-muted mt-4"><Link to="/" className="underline underline-offset-2">Save nothing and go back to Today</Link></p>
     </div>
   );
+  return kind === 'finish' ? <Paced sessionId="w6d1" title={<PageHeader eyebrow={c.eyebrow} title={c.title} back="/" />}>{body}</Paced> : body;
 }

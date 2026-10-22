@@ -29,7 +29,7 @@ export function Library() {
   const read = new Set(data.library.filter((r) => r.kind === 'completed').map((r) => r.itemId));
   return (
     <div>
-      <PageHeader eyebrow="Library" title="Keep practising" intro="Free practice outside the programme: everyday scenarios, and short original readings of two to four minutes." />
+      <PageHeader eyebrow="More" title="Keep practising" back="/more" intro="Free practice outside the programme: everyday scenarios, and short original readings of two to four minutes." />
       <Link to="/practise" className="card !p-4 flex items-center gap-3 hover:bg-surface2 transition-colors mb-8">
         <div className="flex-1 min-w-0">
           <p className="font-serif text-[18px] font-semibold">Practice scenarios</p>

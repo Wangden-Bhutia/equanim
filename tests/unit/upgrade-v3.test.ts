@@ -36,7 +36,14 @@ describe('schema 3 → 4', () => {
     const r = await new Repository(a, { locks: null }).open();
     expect(r.issue).toBeNull();
     expect(r.data.schemaVersion).toBe(SCHEMA_VERSION);
-    expect(r.data).toEqual({ ...doc, schemaVersion: SCHEMA_VERSION, programme: { ...doc.programme, maintenanceStartedAt: null } });
+    // v4 adds maintenanceStartedAt; v5 adds the Round 2 defaults (see upgrade-v4.test.ts).
+    expect(r.data).toEqual({
+      ...doc, schemaVersion: SCHEMA_VERSION,
+      programme: { ...doc.programme, maintenanceStartedAt: null, noticeDismissedAt: doc.programme.disclaimerSeenAt },
+      sessions: doc.sessions.map((x) => ({ ...x, earlyStart: false, thinkResponses: {} })),
+      reviews: doc.reviews.map((x) => ({ ...x, catchUp: false })),
+      plans: doc.plans.map((x) => ({ ...x, valueId: null })),
+    });
     const copies = a.keys().filter((k) => k.startsWith(`${PRE_MIGRATION_PREFIX}store-v3:`));
     expect(copies).toHaveLength(1);
     expect(a.get(copies[0]!)).toBe(raw);
@@ -50,7 +57,7 @@ describe('schema 3 → 4', () => {
     const r = parseImport(JSON.stringify({ app: 'equanim', exportedAt: T(8), data: doc }));
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.data.sessions).toEqual(doc.sessions);
+    expect(r.data.sessions).toEqual(doc.sessions.map((x) => ({ ...x, earlyStart: false, thinkResponses: {} })));
     expect(r.data.programme?.maintenanceStartedAt).toBeNull();
     const withCheckin = { ...r.data, baselines: [...r.data.baselines, { id: 'bl_checkin_2026-12', kind: 'checkin', ratings: { 'b-p1': 4 }, situations: [], completedAt: T(9), updatedAt: T(9) }] };
     const again = parseImport(JSON.stringify({ app: 'equanim', exportedAt: T(9), data: withCheckin }));

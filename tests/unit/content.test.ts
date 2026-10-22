@@ -20,8 +20,8 @@ describe('domains and naming', () => {
     ]);
   });
   it('names primary and secondary pages as specified', () => {
-    expect(PRIMARY_NAV.map((n) => n.label)).toEqual(['Today', 'Journal', 'Library', 'Progress']);
-    expect(SECONDARY_NAV.map((n) => n.label)).toEqual(['The 6-week programme', 'About Equanim', 'Practice Framework', 'Evidence and sources', 'Settings and Data', 'Privacy and Storage']);
+    expect(PRIMARY_NAV.map((n) => n.label)).toEqual(['Today', 'Programme', 'Journal', 'Progress']);
+    expect(SECONDARY_NAV.map((n) => n.label)).toEqual(['Keep practising', 'About Equanim', 'Practice Framework', 'Evidence and sources', 'Settings and Data', 'Privacy and Storage']);
   });
 });
 

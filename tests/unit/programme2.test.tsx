@@ -16,11 +16,11 @@ function seed(d: AppData) {
 const stored = () => (JSON.parse(localStorage.getItem(STORE_KEY) ?? 'null') as { data: AppData }).data;
 const go = (hash: string) => { window.location.hash = hash; };
 const yesterday = () => new Date(Date.now() - 86400000).toISOString();
-const ses = (ids: string[], at = yesterday()) => ids.map((sessionId) => ({ id: `ses_${sessionId}`, sessionId, completedAt: at, updatedAt: at, mode: 'think' as const, answers: {}, choices: {} }));
+const ses = (ids: string[], at = yesterday()) => ids.map((sessionId) => ({ id: `ses_${sessionId}`, sessionId, completedAt: at, updatedAt: at, mode: 'think' as const, answers: {}, choices: {}, earlyStart: false, thinkResponses: {} }));
 const ratings = (v: number) => Object.fromEntries(BASELINE_ITEMS.map((i) => [i.id, v]));
 const bl = (kind: Baseline['kind'], v: number, at: string): Baseline => ({ id: `bl_${kind}_${at}`, kind, ratings: ratings(v), situations: [], completedAt: at, updatedAt: at });
 function enrolled(extra: Partial<AppData> = {}, maintenance: string | null = null): AppData {
-  return { ...emptyData(), onboardingCompletedAt: now(), programme: { startedAt: now(), disclaimerSeenAt: now(), maintenanceStartedAt: maintenance }, ...extra };
+  return { ...emptyData(), onboardingCompletedAt: now(), programme: { startedAt: now(), disclaimerSeenAt: now(), maintenanceStartedAt: maintenance, noticeDismissedAt: now() }, ...extra };
 }
 const upTo = (id: string) => ORDER.slice(0, ORDER.indexOf(id));
 
@@ -98,13 +98,15 @@ describe('Progress, Evidence, About and Phrases', () => {
     seed(enrolled({
       sessions: ses(upTo('w3d1')),
       baselines: [bl('start', 2, '2026-08-01T10:00:00.000Z')],
-      reviews: [{ id: 'rv1', week: 1, worked: 'Pausing first', gotInWay: '', noticed: 'Less replaying', rating: 3, completedAt: yesterday(), updatedAt: yesterday() }],
+      reviews: [{ id: 'rv1', week: 1, worked: 'Pausing first', gotInWay: '', noticed: 'Less replaying', rating: 3, catchUp: false, completedAt: yesterday(), updatedAt: yesterday() }],
     }));
     render(<App />);
     go('#/progress');
     const map = await screen.findByRole('navigation', { name: 'Your six-week journey' });
     expect(within(map).getAllByRole('link')).toHaveLength(6);
-    expect(within(map).getByRole('link', { name: /Week 3.*you are here/ })).toHaveAttribute('aria-current', 'step');
+    expect(within(map).getByRole('link', { name: /Week 3 of 6, .*, 0 of 6 sessions done, current week/ })).toHaveAttribute('aria-current', 'step');
+    expect(within(map).getByRole('link', { name: /Week 1 of 6, .*, 6 of 6 sessions done, complete/ })).toHaveAttribute('data-status', 'done');
+    expect(within(map).getByRole('link', { name: /Week 5 of 6, Integration, 0 of 6 sessions done$/ })).toHaveAttribute('data-status', 'upcoming');
     expect(screen.getByText(/practised this week/)).toBeInTheDocument();
     expect(screen.getByText('Pausing first')).toBeInTheDocument();
     expect(screen.getByText(/You will see it side by side with Week 6/)).toBeInTheDocument();

@@ -1,4 +1,5 @@
 import { DAY0_ID, SESSIONS, SESSION_BY_ID, type SessionDef } from '../data/programme';
+import { SESSION_RANGE } from './time';
 import type { AppData, RecallRecord } from '../types';
 import { addDays, keyFromIso } from './dates';
 import { activityDays } from './progress';
@@ -66,6 +67,63 @@ export function sessionDef(sessionId: string): SessionDef | null {
   return SESSION_BY_ID[sessionId] ?? null;
 }
 
+// ---------- Calendar pacing (schema v5) ----------
+
+const IN_ORDER = new Set(ORDER);
+
+/** True when a programme session was completed for the first time on this local day. */
+export function doneNewOn(d: AppData, day: string): boolean {
+  return d.sessions.some((s) => IN_ORDER.has(s.sessionId) && keyFromIso(s.completedAt) === day);
+}
+
+/**
+ * One new session per calendar day. Returns the day key the next session opens on, or null when it is open now.
+ * A gap never matters: the check only looks at today, so after any absence the next session is simply open.
+ */
+export function opensOn(d: AppData, today: string): string | null {
+  if (currentSessionId(d) === null || inMaintenance(d)) return null;
+  return doneNewOn(d, today) ? addDays(today, 1) : null;
+}
+
+/** Would completing this session now be ahead of schedule? Only a first completion of a programme session can be. */
+export function wouldBeEarly(d: AppData, sessionId: string, today: string): boolean {
+  return IN_ORDER.has(sessionId) && !isDone(d, sessionId) && doneNewOn(d, today);
+}
+
+/** Sessions the user chose to do ahead of schedule ("Do the next one now anyway"). */
+export const earlyCount = (d: AppData) => d.sessions.filter((s) => s.earlyStart).length;
+
+/** "Thursday 23 October", for "opens tomorrow" lines. */
+export function dayLabel(key: string, opts: Intl.DateTimeFormatOptions = { weekday: 'long', day: 'numeric', month: 'long' }): string {
+  const [y, m, dd] = key.split('-').map(Number) as [number, number, number];
+  return new Date(y, m - 1, dd).toLocaleDateString(undefined, opts);
+}
+
+// ---------- Real-life practice (Apply and the weekly review) ----------
+
+/** First day of a programme week: the day its Day 1 was completed, else the day the programme started. */
+export function weekStartKey(d: AppData, week: number): string | null {
+  const s = d.sessions.find((x) => x.sessionId === `w${week}d1`);
+  if (s) return keyFromIso(s.completedAt);
+  return d.programme ? keyFromIso(d.programme.startedAt) : null;
+}
+
+/** If-then plans made in this programme week, up to and including today. */
+export function plansThisWeek(d: AppData, week: number, today: string) {
+  const start = weekStartKey(d, week);
+  return d.plans.filter((p) => (start === null || p.date >= start) && p.date <= today);
+}
+
+/** Day 4 Apply can be completed once there is at least one if-then plan made today or earlier this week. */
+export const applyReady = (d: AppData, week: number, today: string) => plansThisWeek(d, week, today).length > 0;
+
+/** The full weekly review needs one real-life attempt recorded: a plan, or an evening check (plan outcome or evening reflection). */
+export function weekHasPractice(d: AppData, week: number, today: string): boolean {
+  if (plansThisWeek(d, week, today).length > 0) return true;
+  const start = weekStartKey(d, week);
+  return d.reflections.some((r) => (start === null || r.date >= start) && r.date <= today);
+}
+
 /** When the user has been away for more than a day, Today says "pick up where you left off". Never a penalty. */
 export function isReturning(d: AppData, today: string): boolean {
   if (!d.programme) return false;
@@ -124,7 +182,7 @@ export function reminderIcs(time: string, startDay: string, now: Date = new Date
     'DURATION:PT10M',
     'RRULE:FREQ=DAILY',
     'SUMMARY:Equanim: today’s session',
-    'DESCRIPTION:About 8 minutes. Open Equanim when you have a moment.',
+    `DESCRIPTION:About ${SESSION_RANGE}. Open Equanim when you have a moment.`,
     'BEGIN:VALARM', 'ACTION:DISPLAY', 'TRIGGER:PT0M', 'DESCRIPTION:Equanim: today’s session', 'END:VALARM',
     'END:VEVENT', 'END:VCALENDAR',
   ];

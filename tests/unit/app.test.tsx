@@ -38,21 +38,25 @@ describe('navigation', () => {
     render(<App />);
     // Both the desktop sidebar and the mobile bar are labelled Primary; jsdom renders both.
     const nav = screen.getAllByRole('navigation', { name: 'Primary' }).at(-1)!;
-    expect(within(nav).getAllByRole('link').map((l) => l.textContent)).toEqual(['Today', 'Journal', 'Library', 'Progress']);
-    for (const [tab, h1] of [['Journal', 'Journal'], ['Progress', 'Progress'], ['Library', 'Keep practising']]) {
+    expect(within(nav).getAllByRole('link').map((l) => l.textContent)).toEqual(['Today', 'Programme', 'Journal', 'Progress']);
+    for (const [tab, h1] of [['Programme', 'The 6-week programme'], ['Journal', 'Journal'], ['Progress', 'Progress']]) {
       await u.click(within(nav).getByRole('link', { name: tab }));
       expect(await screen.findByRole('heading', { level: 1, name: h1 })).toBeInTheDocument();
     }
+    // Keep practising is linked from the Programme page footer, and lives in More.
+    await u.click(within(nav).getByRole('link', { name: 'Programme' }));
+    await u.click(await screen.findByTestId('keep-practising-link'));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Keep practising' })).toBeInTheDocument();
     // Scenario practice lives inside Keep practising, and the old /practise route still works.
     await u.click(screen.getByRole('link', { name: /Practice scenarios/ }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Practice scenarios' })).toBeInTheDocument();
     await u.click(within(nav).getByRole('link', { name: 'Today' }));
     expect(await screen.findByText('Morning intention')).toBeInTheDocument();
-    for (const name of ['The 6-week programme', 'About Equanim', 'Practice Framework', 'Evidence and sources', 'Settings and Data', 'Privacy and Storage']) {
+    for (const name of ['Keep practising', 'About Equanim', 'Practice Framework', 'Evidence and sources', 'Settings and Data', 'Privacy and Storage']) {
       await u.click(screen.getByRole('link', { name: /^More:/ }));
       const list = await screen.findByRole('heading', { level: 1, name: 'More' });
       expect(list).toBeInTheDocument();
-      await u.click(within(screen.getByRole('main')).getByRole('link', { name: new RegExp(`^${name}`) }));
+      await u.click(within(screen.getByRole('main')).getAllByRole('link', { name: new RegExp(`^${name}`) })[0]!);
       expect(await screen.findByRole('heading', { level: 1, name })).toBeInTheDocument();
     }
   });
@@ -321,3 +325,17 @@ function dateKeyLocal() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
+
+describe('Round 2 navigation', () => {
+  it('Programme is active on session, review and plan-related pages; old deep links still open', async () => {
+    const { PRIMARY_NAV } = await import('../../src/components/nav');
+    const prog = PRIMARY_NAV.find((n) => n.label === 'Programme')!;
+    expect(prog.also).toEqual(expect.arrayContaining(['/session', '/review', '/baseline', '/values', '/finish']));
+    onboarded();
+    render(<App />);
+    for (const [hash, h1] of [['#/library', 'Keep practising'], ['#/practise', 'Practice scenarios'], ['#/references', 'Evidence and sources']] as const) {
+      window.location.hash = hash;
+      expect(await screen.findByRole('heading', { level: 1, name: h1 })).toBeInTheDocument();
+    }
+  });
+});

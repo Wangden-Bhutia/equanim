@@ -75,8 +75,8 @@ test('[SIMULATED phone: Pixel 7 profile in Chromium, not a real device] welcome,
   await shot(page, '14-today-full', true);
   await axe(page);
 
-  // Keep practising: scenarios live inside the Library tab
-  await primary(page).getByRole('link', { name: 'Library' }).click();
+  // Keep practising (in More): scenarios live inside it
+  await page.goto('./#/library');
   await page.getByRole('link', { name: /Practice scenarios/ }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Practice scenarios' })).toBeVisible();
   await noHorizontalOverflow(page);
@@ -117,8 +117,8 @@ test('[SIMULATED phone: Pixel 7 profile in Chromium, not a real device] welcome,
   await expect(page.getByText('A quieter day.')).toBeVisible();
   await shot(page, '21-journal-list');
 
-  // Library
-  await primary(page).getByRole('link', { name: 'Library' }).click();
+  // Keep practising: readings
+  await page.goto('./#/library');
   await shot(page, '22-library');
   await page.getByRole('link', { name: /Boundaries, Responsibility and Respect/ }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Boundaries, Responsibility and Respect' })).toBeVisible();
@@ -165,7 +165,7 @@ test('[SIMULATED phone: Pixel 7 profile in Chromium, not a real device] welcome,
   const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: /export backup/i }).click()]);
   const json = JSON.parse(fs.readFileSync((await download.path())!, 'utf8'));
   expect(json.app).toBe('equanim');
-  expect(json.data.schemaVersion).toBe(4);
+  expect(json.data.schemaVersion).toBe(5);
   expect(json.data.journal).toHaveLength(3);
   expect(json.data.reflections).toHaveLength(1);
 
@@ -237,7 +237,7 @@ test('desktop sidebar, and the app makes no third-party requests', async ({ page
   await expect(page.getByText('Morning intention')).toBeVisible();
   const sidebar = page.getByRole('complementary', { name: 'Sidebar' });
   await expect(sidebar).toBeVisible();
-  for (const name of ['Today', 'Journal', 'Library', 'Progress', 'The 6-week programme', 'About Equanim', 'Practice Framework', 'Evidence and sources', 'Settings and Data', 'Privacy and Storage']) {
+  for (const name of ['Today', 'Programme', 'Journal', 'Progress', 'Keep practising', 'About Equanim', 'Practice Framework', 'Evidence and sources', 'Settings and Data', 'Privacy and Storage']) {
     await expect(sidebar.getByRole('link', { name, exact: true })).toBeVisible();
   }
   await axe(page);
@@ -249,7 +249,7 @@ test('desktop sidebar, and the app makes no third-party requests', async ({ page
   }
   await page.goto('./#/practise');
   await expect(page.getByRole('heading', { level: 1, name: 'Practice scenarios' })).toBeVisible();
-  await expect(sidebar.getByRole('link', { name: 'Library', exact: true })).toHaveClass(/bg-accent/);
+  await expect(sidebar.getByRole('link', { name: 'Keep practising', exact: true })).toBeVisible();
   await shot(page, '41-desktop-practise');
   expect(foreign).toEqual([]);
 });

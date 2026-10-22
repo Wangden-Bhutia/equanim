@@ -116,6 +116,8 @@ export interface ProgrammeState {
   disclaimerSeenAt: string | null;
   /** Schema v4: set when the user moves on to maintenance mode after Week 6 (or chooses it early). */
   maintenanceStartedAt: string | null;
+  /** Schema v5: when the user tapped "Got it" on the short notice at the top of Today, or null while it shows. */
+  noticeDismissedAt: string | null;
 }
 
 export type SessionMode = 'think' | 'write';
@@ -131,6 +133,10 @@ export interface SessionCompletion {
   answers: Record<string, string>;
   /** Option ids chosen in recognise-the-pattern items, keyed by item id. */
   choices: Record<string, string>;
+  /** Schema v5: true when the user chose "Do the next one now anyway" and finished it on a day another session was already done. */
+  earlyStart: boolean;
+  /** Schema v5: self-commit taps in Think mode, keyed by prompt id ('have-one' | 'not-sure' | 'nothing'). Not a grade. */
+  thinkResponses: Record<string, string>;
 }
 
 /** One of the three chosen values, with the user's sentence. Id = value id. */
@@ -158,6 +164,8 @@ export interface WeeklyReview {
   noticed: string;
   /** 1–5 self-rating for the week's domain, or null if skipped. */
   rating: number | null;
+  /** Schema v5: true for the lighter catch-up version, done in a week with no plan or evening check recorded. */
+  catchUp: boolean;
   completedAt: string;
   updatedAt: string;
 }
@@ -169,6 +177,8 @@ export interface IfThenPlan {
   id: string;
   date: string;
   domain: DomainId | null;
+  /** Schema v5: optional id of one of the user's values that this plan serves. */
+  valueId: string | null;
   when: string;
   then: string;
   outcome: PlanOutcome | null;

@@ -1,15 +1,15 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ArrowRight, Check, ChevronDown, CloudDownload, MessageCircle, Moon, NotebookPen, PlayCircle, RotateCcw, Sunrise } from 'lucide-react';
+import { ArrowRight, Check, ChevronDown, Info, CloudDownload, MessageCircle, Moon, NotebookPen, PlayCircle, RotateCcw, Sunrise } from 'lucide-react';
 import { useStore } from '../../app/store';
-import { PHRASE_BANKS, DAY0_ID, DAY_TYPES, DIDNT_MANAGE_RESPONSE, EVENING_QUESTION, INDEPENDENCE_TEXT, OUTCOME_LABELS, RETRIEVAL_BY_ID, SESSION_BY_ID } from '../../data/programme';
+import { PHRASE_BANKS, DAY0_ID, DAY_TYPES, DIDNT_MANAGE_RESPONSE, EVENING_QUESTION, INDEPENDENCE_TEXT, OUTCOME_LABELS, RETRIEVAL_BY_ID, SESSION_BY_ID, VALUE_BY_ID } from '../../data/programme';
 import { dateKey, formatLongDate, keyFromIso } from '../../engine/dates';
-import { MAINTENANCE_PER_WEEK, checkinDue, currentSessionId, daysPractisedThisWeek, dueRecall, inMaintenance, isReturning, pathProgress, sessionRoute, shouldNudgeBackup, weekDayLabel } from '../../engine/programme';
+import { MAINTENANCE_PER_WEEK, checkinDue, currentSessionId, daysPractisedThisWeek, dueRecall, inMaintenance, isReturning, opensOn, pathProgress, sessionRoute, shouldNudgeBackup, weekDayLabel } from '../../engine/programme';
 import { SCENARIO_BY_ID } from '../../data/scenarios';
 import { activityDays, suggestScenarioId } from '../../engine/progress';
 import { ChoiceItem, ProgrammeChip } from '../../components/programme';
-import { Dialog } from '../../components/ui';
 import { Confirmation } from '../../components/Confirmation';
+import { EarlyStart, OpensLine, useEarlyGo } from '../../components/pacing';
 import { ContinueCard, DailyPracticeCard, EveningReflection, Intention, ScenarioOfTheDay } from '../Today';
 import { practiceForDay } from '../../engine/progress';
 import { dayIndex } from '../../engine/dates';
@@ -54,6 +54,7 @@ function MaintenanceCard() {
           {scenario && <li><Link to={`/practise/${scenario.id}`} className="flex items-center gap-3 rounded-xl border border-line px-3 min-h-[48px]"><PlayCircle size={18} className="text-accent" aria-hidden="true" /><span className="flex-1">Scenario: {scenario.title}</span><ArrowRight size={16} aria-hidden="true" /></Link></li>}
           <li><Link to={`/phrases#${bank.id}`} className="flex items-center gap-3 rounded-xl border border-line px-3 min-h-[48px]"><MessageCircle size={18} className="text-accent" aria-hidden="true" /><span className="flex-1">Phrases: {bank.title}</span><ArrowRight size={16} aria-hidden="true" /></Link></li>
           <li><Link to="/programme" className="flex items-center gap-3 rounded-xl border border-line px-3 min-h-[48px]"><RotateCcw size={18} className="text-accent" aria-hidden="true" /><span className="flex-1">Repeat a week of the programme</span><ArrowRight size={16} aria-hidden="true" /></Link></li>
+          <li><Link to="/library" className="flex items-center gap-3 rounded-xl border border-line px-3 min-h-[48px]"><NotebookPen size={18} className="text-accent" aria-hidden="true" /><span className="flex-1">Keep practising: everything else</span><ArrowRight size={16} aria-hidden="true" /></Link></li>
         </ul>
       </section>
     </div>
@@ -62,6 +63,7 @@ function MaintenanceCard() {
 
 function SessionCard() {
   const { data, startMaintenance } = useStore();
+  const goEarly = useEarlyGo();
   const cur = currentSessionId(data);
   const today = dateKey();
   const doneToday = data.sessions.filter((s) => keyFromIso(s.completedAt) === today && s.sessionId !== 'taster');
@@ -91,14 +93,25 @@ function SessionCard() {
     );
   }
   const { title, meta } = sessionTitle(cur);
-  const isRest = doneToday.length > 0;
+  const opens = opensOn(data, today);
+  if (opens) {
+    return (
+      <section className="card" aria-labelledby="ses-h" data-testid="session-gated">
+        <p className="eyebrow">Next session</p>
+        <h2 id="ses-h" className="font-serif text-[22px] font-semibold mt-1">{title}</h2>
+        <p className="text-muted text-[14.5px] mt-1">{meta}</p>
+        {doneToday.length > 0 && <p className="text-[15px] mt-2 flex gap-2 items-center"><Check size={17} className="text-accent" aria-hidden="true" />Today’s session is done.</p>}
+        <div className="mt-2"><OpensLine day={opens} /></div>
+        <EarlyStart className="mt-3" onGo={() => goEarly(sessionRoute(cur, data))} />
+      </section>
+    );
+  }
   return (
-    <section className="card border-accent/40" aria-labelledby="ses-h">
-      <p className="eyebrow">{isRest ? 'Next session · whenever you are ready' : 'Today’s session'}</p>
+    <section className="card border-accent/40" aria-labelledby="ses-h" data-testid="session-ready">
+      <p className="eyebrow">Today’s session</p>
       <h2 id="ses-h" className="font-serif text-[22px] font-semibold mt-1">{title}</h2>
       <p className="text-muted text-[14.5px] mt-1">{meta}</p>
-      {isRest && <p className="text-[15px] mt-2 flex gap-2 items-center"><Check size={17} className="text-accent" aria-hidden="true" />You did a session today. The next one is open, but one a day is plenty.</p>}
-      <Link to={sessionRoute(cur, data)} className={`${isRest ? 'btn-secondary' : 'btn-primary'} mt-4`}><PlayCircle size={18} aria-hidden="true" />{isRest ? 'Start next session' : 'Start session'}</Link>
+      <Link to={sessionRoute(cur, data)} className="btn-primary mt-4"><PlayCircle size={18} aria-hidden="true" />Start session</Link>
     </section>
   );
 }
@@ -153,6 +166,7 @@ function EveningCheck() {
         <div>
           <p className="text-[13px] text-muted">This morning’s plan</p>
           <p className="font-serif text-[18px] leading-snug mt-0.5">When {plan.when}, I will {plan.then}.</p>
+          {plan.valueId && <p className="text-[14.5px] mt-1" data-testid="plan-value">You planned this for <em className="font-semibold not-italic text-accent">{VALUE_BY_ID[plan.valueId] ?? plan.valueId}</em>.</p>}
           {!editing && plan.outcome ? (
             <div className="mt-3">
               <Confirmation focus={justSaved} className="flex items-center gap-2 font-medium text-accent"><Check size={18} aria-hidden="true" />{OUTCOME_LABELS[plan.outcome]}</Confirmation>
@@ -208,17 +222,43 @@ function BackupNudge() {
   );
 }
 
-function Disclaimer() {
-  const { data, markDisclaimerSeen } = useStore();
-  const open = !!data.programme && !data.programme.disclaimerSeenAt && data.sessions.some((s) => s.sessionId !== 'taster');
+/** A non-blocking notice at the top of Today, one line until expanded, shown until "Got it". The full text is always in About. */
+function IndependenceNotice() {
+  const { data, dismissNotice } = useStore();
+  const [open, setOpen] = useState(false);
+  if (!data.programme || data.programme.noticeDismissedAt) return null;
   return (
-    <Dialog open={open} title="Before you go further" onClose={markDisclaimerSeen} footer={<button className="btn-primary" onClick={markDisclaimerSeen}>I understand</button>}>
-      <div className="space-y-3 text-[15px]">{INDEPENDENCE_TEXT.map((t) => <p key={t}>{t}</p>)}<p className="text-muted">All feedback in Equanim was written in advance; there is no AI. You can read this again under About.</p></div>
-    </Dialog>
+    <aside className="rounded-xl border border-line bg-surface px-4 py-2.5" aria-label="About Equanim" data-testid="independence-notice">
+      <div className="flex items-center gap-2 text-[14px]">
+        <Info size={16} className="text-accent shrink-0" aria-hidden="true" />
+        <p className="flex-1">Independent, not therapy, no AI.</p>
+        <button type="button" className="underline underline-offset-2 text-accent min-h-[44px] px-1" aria-expanded={open} aria-controls="notice-more" onClick={() => setOpen(!open)}>{open ? 'Show less' : 'Read more'}</button>
+      </div>
+      {open && (
+        <div id="notice-more" className="space-y-2 text-[14.5px] mt-1 pb-1">
+          {INDEPENDENCE_TEXT.map((t) => <p key={t}>{t}</p>)}
+          <p className="text-muted">All feedback in Equanim was written in advance; there is no AI. This text is always in About.</p>
+        </div>
+      )}
+      <button type="button" className="btn-ghost !px-0 text-[14px]" onClick={dismissNotice}>Got it</button>
+    </aside>
   );
 }
 
+/** Re-renders when the local date changes (an app left open overnight), so "Opens tomorrow" turns into today's session. */
+function useDayChange() {
+  const [, setDay] = useState(() => dateKey());
+  useEffect(() => {
+    const tick = () => setDay((prev) => { const k = dateKey(); return k === prev ? prev : k; });
+    const id = window.setInterval(tick, 30000);
+    document.addEventListener('visibilitychange', tick);
+    window.addEventListener('focus', tick);
+    return () => { window.clearInterval(id); document.removeEventListener('visibilitychange', tick); window.removeEventListener('focus', tick); };
+  }, []);
+}
+
 export function ProgrammeToday() {
+  useDayChange();
   const { data } = useStore();
   const loc = useLocation();
   const now = new Date();
@@ -230,6 +270,7 @@ export function ProgrammeToday() {
   const justFinishedDay0 = (loc.state as { completed?: string } | null)?.completed === DAY0_ID;
   return (
     <div className="space-y-5">
+      <IndependenceNotice />
       <section aria-labelledby="today-h">
         <p className="eyebrow">{formatLongDate(now)}{name ? ` · ${name}` : ''}</p>
         <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
@@ -240,7 +281,7 @@ export function ProgrammeToday() {
             <Link to="/programme" aria-label={`${weekDayLabel(cur)}. Open the programme`}><ProgrammeChip label={weekDayLabel(cur)} progress={pathProgress(data)} /></Link>
           )}
         </div>
-        {justFinishedDay0 && <p role="status" className="mt-3 text-[15px]">Day 0 is done. Week 1 starts whenever you are ready.</p>}
+        {justFinishedDay0 && <p role="status" className="mt-3 text-[15px]">Day 0 is done. Week 1 starts tomorrow, or any day after that.</p>}
         {isReturning(data, today) && <p className="mt-3 text-[15px] rounded-xl bg-accentsoft px-3 py-2">Welcome back. Pick up where you left off: nothing has been lost, and there is no catching up to do.</p>}
       </section>
       <SessionCard />
@@ -261,7 +302,6 @@ export function ProgrammeToday() {
           <EveningReflection />
         </div>
       </details>
-      <Disclaimer />
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Brain, PenLine } from 'lucide-react';
+import { BookOpen, Brain, ClipboardList, Eye, Mic, PenLine, Puzzle, RotateCcw, Sparkles, Sunrise, Target, type LucideIcon } from 'lucide-react';
+import type { DomainId } from '../types';
+import type { SessionType } from '../data/programme';
 import type { Choice } from '../data/programme';
 import { SAFETY_LINE } from '../data/programme';
 import type { SessionMode } from '../types';
@@ -81,6 +83,24 @@ export function StepShell({ children, footer }: { children: React.ReactNode; foo
       <div className="mb-8"><span className="font-serif text-xl font-semibold">Equanim</span></div>
       <main id="main" className="flex-1">{children}</main>
       {footer && <div className="mt-8">{footer}</div>}
+    </div>
+  );
+}
+
+/** One small icon per session type, used on session headers. */
+export const TYPE_ICONS: Record<SessionType, LucideIcon> = {
+  taster: Sparkles, understand: BookOpen, recognise: Eye, rehearse: Mic, apply: Target, retrieve: RotateCcw, review: ClipboardList, integrate: Puzzle, consolidate: Sunrise,
+};
+const ACCENT_BG: Record<DomainId, string> = { personalisation: 'bg-personalisation', inquiry: 'bg-inquiry', speech: 'bg-speech', effort: 'bg-effort' };
+const ACCENT_TEXT: Record<DomainId, string> = { personalisation: 'text-personalisation', inquiry: 'text-inquiry', speech: 'text-speech', effort: 'text-effort' };
+
+/** Session header mark: the type icon in the skill colour, and a thin accent rule. Decorative. */
+export function SessionMark({ type, domain }: { type: SessionType; domain: DomainId | null }) {
+  const Icon = TYPE_ICONS[type];
+  return (
+    <div className="flex items-center gap-3 mb-3" aria-hidden="true" data-testid="session-mark">
+      <span className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-accentsoft"><Icon size={18} className={domain ? ACCENT_TEXT[domain] : 'text-accent'} /></span>
+      <span className={`h-1 flex-1 rounded-full ${domain ? ACCENT_BG[domain] : 'bg-accent'} opacity-80`} />
     </div>
   );
 }

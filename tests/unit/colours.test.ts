@@ -34,3 +34,22 @@ describe('per-skill accent colours', () => {
     });
   }
 });
+
+describe('journey map and completion marks (Round 2)', () => {
+  for (const [theme, sel] of [['light', ':root'], ['dark', "[data-theme='dark']"]] as const) {
+    it(`a done node's check (surface on skill colour, on-accent on accent) has at least 4.5:1 contrast (${theme})`, () => {
+      const b = block(sel);
+      for (const d of ['speech', 'personalisation', 'inquiry', 'effort']) {
+        const c = contrast(rgb(b, 'surface'), rgb(b, `d-${d}`));
+        expect(c, `${theme} check on ${d}: ${c.toFixed(2)}`).toBeGreaterThanOrEqual(4.5);
+      }
+      expect(contrast(rgb(b, 'on-accent'), rgb(b, 'accent'))).toBeGreaterThanOrEqual(4.5);
+    });
+    it(`the completion check (accent on accent-soft) and node rings are visible (${theme})`, () => {
+      const b = block(sel);
+      expect(contrast(rgb(b, 'accent'), rgb(b, 'accent-soft'))).toBeGreaterThanOrEqual(4.5);
+      // Upcoming nodes are outlined in --line on --surface; their label text carries the meaning, and the ring is decorative.
+      for (const d of ['speech', 'personalisation', 'inquiry', 'effort']) expect(contrast(rgb(b, `d-${d}`), rgb(b, 'surface'))).toBeGreaterThanOrEqual(3);
+    });
+  }
+});

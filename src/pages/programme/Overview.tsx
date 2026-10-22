@@ -1,9 +1,12 @@
 import { Link, useParams } from 'react-router-dom';
+import { DAILY_TIME, REVIEW_TIME, cap } from '../../engine/time';
 import { Check, ChevronRight, Circle, Lock } from 'lucide-react';
 import { useStore } from '../../app/store';
 import { DAY0_ID, DAY_TYPES, SESSIONS, SESSION_BY_ID, WEEKS } from '../../data/programme';
-import { BaselineCompare, EvidenceOfChange, ValuesList, WeekMotif } from '../../components/journey';
-import { currentSessionId, inMaintenance, isDone, isUnlocked, latestSnapshot, pathProgress, sessionRoute, weekDayLabel } from '../../engine/programme';
+import { BaselineCompare, EvidenceOfChange, JourneyMap, ValuesList, WeekMotif } from '../../components/journey';
+import { dateKey } from '../../engine/dates';
+import { earlyLine } from '../Progress';
+import { currentSessionId, dayLabel, earlyCount, opensOn, inMaintenance, isDone, isUnlocked, latestSnapshot, pathProgress, sessionRoute, weekDayLabel } from '../../engine/programme';
 
 const MAINTENANCE_PROMPTS = SESSION_BY_ID.w6d5?.prompts ?? [];
 import { PageHeader } from '../../components/ui';
@@ -13,10 +16,13 @@ import { NotFound } from '../NotFound';
 export function ProgrammeOverview() {
   const { data } = useStore();
   const cur = currentSessionId(data);
+  const opens = opensOn(data, dateKey());
   return (
     <div>
-      <PageHeader title="The 6-week programme" back="/" intro="Six to ten minutes a day, plus a short review each week. Sessions open in order and can be done late; nothing is lost by a gap." />
-      {data.programme && <div className="mb-6"><ProgrammeChip label={weekDayLabel(cur)} progress={pathProgress(data)} /></div>}
+      <PageHeader title="The 6-week programme" intro={`${cap(DAILY_TIME)}; ${REVIEW_TIME}. One new session opens each day, and nothing is lost by a gap.`} />
+      {data.programme && <div className="mb-6"><ProgrammeChip label={weekDayLabel(cur)} progress={pathProgress(data)} />
+        <div className="card mt-4"><JourneyMap data={data} /></div>
+        {cur && opens && <p className="text-[14px] text-muted mt-2" data-testid="overview-opens">Next session opens {dayLabel(opens, { weekday: 'long' })}.</p>}</div>}
       <ul className="space-y-3">
         <li>
           <Link to={sessionRoute(DAY0_ID, data)} className="card !p-4 flex items-center gap-3 hover:bg-surface2">
@@ -39,6 +45,10 @@ export function ProgrammeOverview() {
           );
         })}
       </ul>
+      <Link to="/library" className="card !p-4 mt-6 flex items-center gap-3 hover:bg-surface2" data-testid="keep-practising-link">
+        <span className="flex-1"><span className="font-semibold block">Keep practising</span><span className="text-sm text-muted block">Scenarios, readings and phrases, any time, outside the daily session.</span></span>
+        <ChevronRight size={20} aria-hidden="true" />
+      </Link>
     </div>
   );
 }
@@ -49,6 +59,8 @@ export function ProgrammeWeek() {
   const w = WEEKS.find((x) => x.week === Number(n));
   if (!w) return <NotFound />;
   const ss = SESSIONS.filter((s) => s.week === w.week);
+  const cur = currentSessionId(data);
+  const opens = opensOn(data, dateKey());
   return (
     <div>
       <PageHeader eyebrow={`Week ${w.week}`} title={w.title} back="/programme" intro={w.summary} />
@@ -66,7 +78,7 @@ export function ProgrammeWeek() {
             <>
               {done ? <Check size={20} className="text-accent shrink-0" aria-hidden="true" /> : open ? <Circle size={20} className="text-accent shrink-0" aria-hidden="true" /> : <Lock size={18} className="text-muted shrink-0" aria-hidden="true" />}
               <span className="flex-1 min-w-0"><span className="block font-medium">Day {s.day} · {DAY_TYPES[s.day]?.label}</span>
-                <span className="block text-sm text-muted">{s.available ? `${s.title} · ${s.minutes} min` : 'Arrives in the next update'}{done ? ' · done' : !open && s.available ? ' · opens after the previous session' : ''}</span></span>
+                <span className="block text-sm text-muted">{s.available ? `${s.title} · ${s.minutes} min` : 'Arrives in the next update'}{done ? ' · done' : s.id === cur && opens ? ` · opens ${dayLabel(opens, { weekday: 'long' })}` : !open && s.available ? ' · opens after the previous session' : ''}</span></span>
             </>
           );
           return <li key={s.id}>{open ? <Link to={sessionRoute(s.id, data)} className="card !p-4 flex items-center gap-3 hover:bg-surface2">{body}</Link> : <div className="card !p-4 flex items-center gap-3">{body}</div>}</li>;
@@ -90,6 +102,7 @@ export function Finish() {
     <div className="space-y-4">
       <PageHeader eyebrow="Week 6" title="Your six weeks" back="/"
         intro={cur === null ? 'You have completed the programme. Here is what you recorded, side by side and in your own words.' : 'This page fills in as you reach Week 6. Here is what you have recorded so far.'} />
+      {earlyLine(earlyCount(data)) && <p className="text-[14.5px] text-muted" data-testid="finish-early">{earlyLine(earlyCount(data))}</p>}
       <section className="card" aria-labelledby="fin-cmp">
         <h2 id="fin-cmp" className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted mb-2">Day 0 and Week 6, side by side</h2>
         {now ? <BaselineCompare start={start} now={now} nowLabel={now.kind === 'checkin' ? 'Check-in' : 'Week 6'} />

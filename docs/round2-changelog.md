@@ -1,0 +1,42 @@
+# Round 2 changelog (feat/round2)
+
+The storage key `equanim:store`, the base path `/equanim/` and the manifest id are all unchanged. There are no new dependencies and no new network requests, and the CSP is unchanged.
+
+- **(a) Schema v5 and calendar pacing**
+  - The v4→v5 upgrade is additive and lossless. An exact v4 copy is kept, and existing records get safe defaults (`earlyStart:false`, `thinkResponses:{}`, `catchUp:false`, `valueId:null`, `noticeDismissedAt`).
+  - Nothing is gated retroactively.
+  - One new session opens per local calendar day. Today, the Programme pages and deep links say "Opens tomorrow" and give the date.
+  - "Do the next one now anyway" is confirmed once with a note on spacing, and the session is recorded with `earlyStart:true`.
+  - Gaps never penalise.
+  - Spaced recall still counts calendar days from first exposure.
+- **(b) Real-life practice**
+  - Day 4 Apply finishes only once there is a plan this week. It shows "Make today's plan first" and "I'll do this later".
+  - The weekly review needs a plan or an evening check. Without one, it offers a "catch-up" version, saved with `catchUp:true`.
+- **(c) Active learning**
+  - Each lesson (W1–W5 Day 1) has one micro-check. Any answer teaches, and Complete appears once it is answered.
+  - Think mode has self-commit taps, stored as `thinkResponses`.
+- **(d) Values in plans**
+  - The plan builder has optional value chips, each showing the user's own sentence, and saves `valueId`.
+  - The chosen value shows on the evening check ("You planned this for Calm.") and in the weekly review ("Which values did your plans serve?").
+  - A collapsed "Your values" card appears on Apply and the review. If no values were chosen, a link to /values shows instead.
+- **(e) Navigation**
+  - The tabs are Today / Programme / Journal / Progress.
+  - "Keep practising" (Library and scenarios) lives in More and is linked from the Programme page, Week 6/Finish and maintenance.
+  - All old deep links still work.
+- **(f) Progress**
+  - Order: journey map, Day 0 vs now, plans, values, "what I noticed" timeline, days this week.
+  - Legacy blocks show only when they hold records, inside a collapsed "Keep practising activity" section. There are no 0 tiles.
+  - One honest ahead-of-schedule line, also shown on Finish.
+- **(g) Time claims**
+  - All time claims come from one helper, `src/engine/time.ts`, computed from session data: "about 8 to 12 minutes a day, including your morning plan and evening check; Day 6 reviews take about 12 minutes".
+  - A drift test fails if any copy hard-codes a time.
+- **(h) Notice**
+  - The blocking "Before you go further" dialog is replaced by a one-line inline notice on Today, which expands in place until "Got it".
+  - The safety line stays on the welcome screen, About, and now More.
+- **(i) Visual**
+  - The journey map is now six connected nodes on a gentle path. Nodes are filled, ringed or outlined, in skill colours, with full screen-reader labels.
+  - Completion moments are calm: a check that draws in within 600 ms, plus a non-repeating line for each session type. Weekly-review and Week 6 moments are larger and restate the week's idea. Under reduced motion they are text only.
+  - Session headers have an icon and an accent rule. The lesson and its example are in separate cards, with 16px body text.
+- **(j) Tests**
+  - Unit tests: 194.
+  - e2e tests: 25. The full path runs with a faked clock that advances one day per session. There are new specs for the override, Apply, the catch-up review, the tab bar and Progress, with axe at 390 light/dark and 360.

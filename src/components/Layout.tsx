@@ -51,7 +51,7 @@ export function Layout() {
         <header className="lg:hidden sticky top-0 z-30 bg-bg/95 backdrop-blur border-b border-line">
           <div className="mx-auto max-w-app px-5 h-14 flex items-center justify-between">
             <Link to="/" className="font-serif text-xl font-semibold tracking-tight text-ink" aria-label="Equanim, go to Today">Equanim</Link>
-            <Link to="/more" className="btn-ghost !min-h-[44px] !px-2.5" aria-label="More: about, framework, references, settings and privacy">
+            <Link to="/more" className="btn-ghost !min-h-[44px] !px-2.5" aria-label="More: keep practising, about, evidence, settings and privacy">
               <Menu size={22} aria-hidden="true" />
             </Link>
           </div>

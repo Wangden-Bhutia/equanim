@@ -6,6 +6,7 @@ import { STORE_KEY } from '../../src/storage/storage';
 import { emptyData } from '../../src/storage/schema';
 import { addDays, dateKey } from '../../src/engine/dates';
 import { BASELINE_ITEMS, DIDNT_MANAGE_RESPONSE } from '../../src/data/programme';
+import { DAILY_SHORT } from '../../src/engine/time';
 import type { AppData } from '../../src/types';
 
 const now = () => new Date().toISOString();
@@ -15,9 +16,9 @@ function seed(d: AppData) {
 const stored = () => (JSON.parse(localStorage.getItem(STORE_KEY) ?? 'null') as { data: AppData }).data;
 const go = (hash: string) => { window.location.hash = hash; };
 const yesterday = () => new Date(Date.now() - 86400000).toISOString();
-const ses = (...ids: string[]) => ids.map((sessionId) => ({ id: `ses_${sessionId}`, sessionId, completedAt: yesterday(), updatedAt: now(), mode: 'think' as const, answers: {}, choices: {} }));
+const ses = (...ids: string[]) => ids.map((sessionId) => ({ id: `ses_${sessionId}`, sessionId, completedAt: yesterday(), updatedAt: now(), mode: 'think' as const, answers: {}, choices: {}, earlyStart: false, thinkResponses: {} }));
 function enrolled(extra: Partial<AppData> = {}): AppData {
-  return { ...emptyData(), onboardingCompletedAt: now(), programme: { startedAt: now(), disclaimerSeenAt: now(), maintenanceStartedAt: null }, ...extra };
+  return { ...emptyData(), onboardingCompletedAt: now(), programme: { startedAt: now(), disclaimerSeenAt: now(), maintenanceStartedAt: null, noticeDismissedAt: now() }, ...extra };
 }
 
 beforeEach(() => go('#/'));
@@ -28,7 +29,7 @@ describe('onboarding: welcome → Day 0', () => {
     render(<App />);
     expect(await screen.findByRole('heading', { level: 1, name: /respond, rather than react/i })).toBeInTheDocument();
     expect(screen.getByText('6 weeks')).toBeInTheDocument();
-    expect(screen.getByText('About 8 min a day')).toBeInTheDocument();
+    expect(screen.getByText(DAILY_SHORT)).toBeInTheDocument();
     expect(screen.getByText(/Private on your device/)).toBeInTheDocument();
     expect(screen.getByText(/Tele-MANAS 14416 or 1-800-891-4416/)).toBeInTheDocument();
     expect(screen.queryByText(/Sample journey/)).not.toBeInTheDocument();
@@ -56,11 +57,18 @@ describe('onboarding: welcome → Day 0', () => {
     await u.click(finish);
 
     expect(await screen.findByText('Week 1 · Day 1 of 42')).toBeInTheDocument();
-    const dlg = await screen.findByRole('dialog', { name: 'Before you go further' });
-    expect(within(dlg).getByText(/not endorsed by or affiliated with/)).toBeInTheDocument();
-    await u.click(within(dlg).getByRole('button', { name: 'I understand' }));
+    // No blocking dialog: a one-line notice at the top of Today, expanding in place, until "Got it".
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    const notice = await screen.findByTestId('independence-notice');
+    expect(within(notice).getByText('Independent, not therapy, no AI.')).toBeInTheDocument();
+    expect(within(notice).queryByText(/not endorsed by or affiliated with/)).not.toBeInTheDocument();
+    await u.click(within(notice).getByRole('button', { name: 'Read more' }));
+    expect(within(notice).getByText(/not endorsed by or affiliated with/)).toBeInTheDocument();
+    expect(within(notice).getByText(/Tele-MANAS on 14416/)).toBeInTheDocument();
+    await u.click(within(notice).getByRole('button', { name: 'Got it' }));
+    expect(screen.queryByTestId('independence-notice')).not.toBeInTheDocument();
     const d = stored();
-    expect(d.programme?.disclaimerSeenAt).toBeTruthy();
+    expect(d.programme?.noticeDismissedAt).toBeTruthy();
     expect(d.values.map((v) => v.id)).toEqual(['honesty', 'calm', 'kindness']);
     expect(d.baselines[0]).toMatchObject({ kind: 'start', situations: ['A curt email', ''] });
     expect(Object.keys(d.baselines[0]!.ratings)).toHaveLength(BASELINE_ITEMS.length);
@@ -106,11 +114,17 @@ describe('Today and sessions', () => {
     await u.click(screen.getByRole('radio', { name: /Write it down/ }));
     const box = screen.getAllByRole('textbox')[0]!;
     await u.type(box, 'My note');
+    expect(screen.getByTestId('check-first')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Complete session' })).not.toBeInTheDocument();
+    // A different answer teaches and does not block.
+    await u.click(screen.getByRole('radio', { name: 'She is ignoring me.' }));
+    expect(screen.getByText(/meaning added to the silence/)).toBeInTheDocument();
     await u.click(screen.getByRole('button', { name: 'Complete session' }));
     expect(await screen.findByText('Session complete')).toBeInTheDocument();
     const rec = stored().sessions.find((s) => s.sessionId === 'w1d1')!;
     expect(rec.mode).toBe('write');
     expect(Object.values(rec.answers)).toContain('My note');
+    expect(rec.choices['mc-w1d1']).toBe('b');
     go('#/session/w1d3');
     expect(await screen.findByText(/opens after you finish the ones before it/)).toBeInTheDocument();
     go('#/');
@@ -119,7 +133,7 @@ describe('Today and sessions', () => {
 
   it('says "pick up where you left off" after a gap, with no penalty', async () => {
     const old = new Date(Date.now() - 5 * 86400000).toISOString();
-    seed(enrolled({ programme: { startedAt: old, disclaimerSeenAt: old, maintenanceStartedAt: null }, sessions: ses('w0d0').map((s) => ({ ...s, completedAt: old })) }));
+    seed(enrolled({ programme: { startedAt: old, disclaimerSeenAt: old, maintenanceStartedAt: null, noticeDismissedAt: null }, sessions: ses('w0d0').map((s) => ({ ...s, completedAt: old })) }));
     render(<App />);
     expect(await screen.findByText(/Pick up where you left off/)).toBeInTheDocument();
     expect(screen.getByText('Week 1 · Day 1 of 42')).toBeInTheDocument();
@@ -156,7 +170,8 @@ describe('habit loop', () => {
   });
 
   it('weekly review completes Day 6; Today then moves on to Week 2', async () => {
-    seed(enrolled({ sessions: ses('w0d0', 'w1d1', 'w1d2', 'w1d3', 'w1d4', 'w1d5') }));
+    const plan = { id: 'p1', date: dateKey(), domain: null, valueId: null, when: 'a', then: 'b', outcome: 'tried' as const, note: '', createdAt: now(), updatedAt: now() };
+    seed(enrolled({ sessions: ses('w0d0', 'w1d1', 'w1d2', 'w1d3', 'w1d4', 'w1d5'), plans: [plan] }));
     const u = userEvent.setup();
     render(<App />);
     expect(await screen.findByText('Week 1 · Day 6 of 42')).toBeInTheDocument();
@@ -166,7 +181,7 @@ describe('habit loop', () => {
     await u.click(screen.getByRole('radio', { name: /4/ }));
     await u.click(screen.getByRole('button', { name: 'Complete review' }));
     expect(await screen.findByText('Week 1 review saved')).toBeInTheDocument();
-    expect(stored().reviews[0]).toMatchObject({ week: 1, worked: 'Pausing', rating: 4 });
+    expect(stored().reviews[0]).toMatchObject({ week: 1, worked: 'Pausing', rating: 4, catchUp: false });
     go('#/');
     expect(await screen.findByText('Week 2 · Day 8 of 42')).toBeInTheDocument();
   });
@@ -189,7 +204,7 @@ describe('settings: reminder and backup', () => {
     expect(screen.getByTestId('last-export')).not.toHaveTextContent('never');
   });
   it('nudges a backup after 7 days of use, and can be dismissed', async () => {
-    const plans = Array.from({ length: 7 }, (_, i) => { const date = addDays(dateKey(), -i - 1); return { id: `p${i}`, date, domain: null, when: 'a', then: 'b', outcome: null, note: '', createdAt: `${date}T10:00:00.000Z`, updatedAt: `${date}T10:00:00.000Z` }; });
+    const plans = Array.from({ length: 7 }, (_, i) => { const date = addDays(dateKey(), -i - 1); return { id: `p${i}`, date, domain: null, valueId: null, when: 'a', then: 'b', outcome: null, note: '', createdAt: `${date}T10:00:00.000Z`, updatedAt: `${date}T10:00:00.000Z` }; });
     seed(enrolled({ plans }));
     const u = userEvent.setup();
     render(<App />);

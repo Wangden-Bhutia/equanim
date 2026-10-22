@@ -2,6 +2,7 @@ import type { DomainId } from '../types';
 import { RETRIEVAL_MORE } from './programme/retrieval-more';
 import { WEEK2, WEEK3, WEEK4, WEEK5, WEEK6 } from './programme/weeks';
 export { PHRASE_BANKS, PHRASE_BANK_BY_ID, type PhraseBank } from './programme/phrases';
+export { MICRO_CHECKS, THINK_RESPONSES } from './programme/checks';
 export { INTEGRATION, INTEGRATION_BY_ID, type IntegrationScenario } from './programme/integration';
 import { DOMAINS } from './domains';
 
