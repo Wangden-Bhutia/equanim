@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ArrowRight, Check, ChevronDown, CloudDownload, MessageCircle, Moon, NotebookPen, PlayCircle, RotateCcw, Sunrise } from 'lucide-react';
+import { ArrowRight, Check, ChevronDown, Info, CloudDownload, MessageCircle, Moon, NotebookPen, PlayCircle, RotateCcw, Sunrise } from 'lucide-react';
 import { useStore } from '../../app/store';
 import { PHRASE_BANKS, DAY0_ID, DAY_TYPES, DIDNT_MANAGE_RESPONSE, EVENING_QUESTION, INDEPENDENCE_TEXT, OUTCOME_LABELS, RETRIEVAL_BY_ID, SESSION_BY_ID, VALUE_BY_ID } from '../../data/programme';
 import { dateKey, formatLongDate, keyFromIso } from '../../engine/dates';
@@ -8,7 +8,6 @@ import { MAINTENANCE_PER_WEEK, checkinDue, currentSessionId, daysPractisedThisWe
 import { SCENARIO_BY_ID } from '../../data/scenarios';
 import { activityDays, suggestScenarioId } from '../../engine/progress';
 import { ChoiceItem, ProgrammeChip } from '../../components/programme';
-import { Dialog } from '../../components/ui';
 import { Confirmation } from '../../components/Confirmation';
 import { EarlyStart, OpensLine, useEarlyGo } from '../../components/pacing';
 import { ContinueCard, DailyPracticeCard, EveningReflection, Intention, ScenarioOfTheDay } from '../Today';
@@ -223,13 +222,26 @@ function BackupNudge() {
   );
 }
 
-function Disclaimer() {
-  const { data, markDisclaimerSeen } = useStore();
-  const open = !!data.programme && !data.programme.disclaimerSeenAt && data.sessions.some((s) => s.sessionId !== 'taster');
+/** A non-blocking notice at the top of Today, one line until expanded, shown until "Got it". The full text is always in About. */
+function IndependenceNotice() {
+  const { data, dismissNotice } = useStore();
+  const [open, setOpen] = useState(false);
+  if (!data.programme || data.programme.noticeDismissedAt) return null;
   return (
-    <Dialog open={open} title="Before you go further" onClose={markDisclaimerSeen} footer={<button className="btn-primary" onClick={markDisclaimerSeen}>I understand</button>}>
-      <div className="space-y-3 text-[15px]">{INDEPENDENCE_TEXT.map((t) => <p key={t}>{t}</p>)}<p className="text-muted">All feedback in Equanim was written in advance; there is no AI. You can read this again under About.</p></div>
-    </Dialog>
+    <aside className="rounded-xl border border-line bg-surface px-4 py-2.5" aria-label="About Equanim" data-testid="independence-notice">
+      <div className="flex items-center gap-2 text-[14px]">
+        <Info size={16} className="text-accent shrink-0" aria-hidden="true" />
+        <p className="flex-1">Independent, not therapy, no AI.</p>
+        <button type="button" className="underline underline-offset-2 text-accent min-h-[44px] px-1" aria-expanded={open} aria-controls="notice-more" onClick={() => setOpen(!open)}>{open ? 'Show less' : 'Read more'}</button>
+      </div>
+      {open && (
+        <div id="notice-more" className="space-y-2 text-[14.5px] mt-1 pb-1">
+          {INDEPENDENCE_TEXT.map((t) => <p key={t}>{t}</p>)}
+          <p className="text-muted">All feedback in Equanim was written in advance; there is no AI. This text is always in About.</p>
+        </div>
+      )}
+      <button type="button" className="btn-ghost !px-0 text-[14px]" onClick={dismissNotice}>Got it</button>
+    </aside>
   );
 }
 
@@ -245,6 +257,7 @@ export function ProgrammeToday() {
   const justFinishedDay0 = (loc.state as { completed?: string } | null)?.completed === DAY0_ID;
   return (
     <div className="space-y-5">
+      <IndependenceNotice />
       <section aria-labelledby="today-h">
         <p className="eyebrow">{formatLongDate(now)}{name ? ` · ${name}` : ''}</p>
         <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
@@ -276,7 +289,6 @@ export function ProgrammeToday() {
           <EveningReflection />
         </div>
       </details>
-      <Disclaimer />
     </div>
   );
 }

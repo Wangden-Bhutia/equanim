@@ -57,11 +57,18 @@ describe('onboarding: welcome → Day 0', () => {
     await u.click(finish);
 
     expect(await screen.findByText('Week 1 · Day 1 of 42')).toBeInTheDocument();
-    const dlg = await screen.findByRole('dialog', { name: 'Before you go further' });
-    expect(within(dlg).getByText(/not endorsed by or affiliated with/)).toBeInTheDocument();
-    await u.click(within(dlg).getByRole('button', { name: 'I understand' }));
+    // No blocking dialog: a one-line notice at the top of Today, expanding in place, until "Got it".
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    const notice = await screen.findByTestId('independence-notice');
+    expect(within(notice).getByText('Independent, not therapy, no AI.')).toBeInTheDocument();
+    expect(within(notice).queryByText(/not endorsed by or affiliated with/)).not.toBeInTheDocument();
+    await u.click(within(notice).getByRole('button', { name: 'Read more' }));
+    expect(within(notice).getByText(/not endorsed by or affiliated with/)).toBeInTheDocument();
+    expect(within(notice).getByText(/Tele-MANAS on 14416/)).toBeInTheDocument();
+    await u.click(within(notice).getByRole('button', { name: 'Got it' }));
+    expect(screen.queryByTestId('independence-notice')).not.toBeInTheDocument();
     const d = stored();
-    expect(d.programme?.disclaimerSeenAt).toBeTruthy();
+    expect(d.programme?.noticeDismissedAt).toBeTruthy();
     expect(d.values.map((v) => v.id)).toEqual(['honesty', 'calm', 'kindness']);
     expect(d.baselines[0]).toMatchObject({ kind: 'start', situations: ['A curt email', ''] });
     expect(Object.keys(d.baselines[0]!.ratings)).toHaveLength(BASELINE_ITEMS.length);

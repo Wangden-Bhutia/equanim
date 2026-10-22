@@ -60,6 +60,8 @@ interface StoreValue {
   // 6-week programme
   startProgramme: () => void;
   markDisclaimerSeen: () => void;
+  /** Hides the short notice on Today ("Got it"). */
+  dismissNotice: () => void;
   startMaintenance: () => void;
   saveValues: (choices: { id: string; sentence: string }[]) => void;
   saveBaseline: (kind: 'start' | 'finish' | 'checkin', ratings: Record<string, number>, situations: string[]) => void;
@@ -365,6 +367,10 @@ export function StoreProvider({ children, adapter, locks, channel }: {
     markDisclaimerSeen: () => {
       const t = now();
       update((d) => ({ ...d, programme: d.programme ? { ...d.programme, disclaimerSeenAt: d.programme.disclaimerSeenAt ?? t } : d.programme }));
+    },
+    dismissNotice: () => {
+      const t = now();
+      update((d) => ({ ...d, programme: d.programme ? { ...d.programme, disclaimerSeenAt: d.programme.disclaimerSeenAt ?? t, noticeDismissedAt: d.programme.noticeDismissedAt ?? t } : d.programme }));
     },
     saveValues: (choices) => {
       const t = now();
