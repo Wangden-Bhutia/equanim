@@ -106,11 +106,17 @@ describe('Today and sessions', () => {
     await u.click(screen.getByRole('radio', { name: /Write it down/ }));
     const box = screen.getAllByRole('textbox')[0]!;
     await u.type(box, 'My note');
+    expect(screen.getByTestId('check-first')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Complete session' })).not.toBeInTheDocument();
+    // A different answer teaches and does not block.
+    await u.click(screen.getByRole('radio', { name: 'She is ignoring me.' }));
+    expect(screen.getByText(/meaning added to the silence/)).toBeInTheDocument();
     await u.click(screen.getByRole('button', { name: 'Complete session' }));
     expect(await screen.findByText('Session complete')).toBeInTheDocument();
     const rec = stored().sessions.find((s) => s.sessionId === 'w1d1')!;
     expect(rec.mode).toBe('write');
     expect(Object.values(rec.answers)).toContain('My note');
+    expect(rec.choices['mc-w1d1']).toBe('b');
     go('#/session/w1d3');
     expect(await screen.findByText(/opens after you finish the ones before it/)).toBeInTheDocument();
     go('#/');
