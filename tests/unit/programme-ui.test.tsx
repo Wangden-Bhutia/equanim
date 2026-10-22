@@ -15,9 +15,9 @@ function seed(d: AppData) {
 const stored = () => (JSON.parse(localStorage.getItem(STORE_KEY) ?? 'null') as { data: AppData }).data;
 const go = (hash: string) => { window.location.hash = hash; };
 const yesterday = () => new Date(Date.now() - 86400000).toISOString();
-const ses = (...ids: string[]) => ids.map((sessionId) => ({ id: `ses_${sessionId}`, sessionId, completedAt: yesterday(), updatedAt: now(), mode: 'think' as const, answers: {}, choices: {} }));
+const ses = (...ids: string[]) => ids.map((sessionId) => ({ id: `ses_${sessionId}`, sessionId, completedAt: yesterday(), updatedAt: now(), mode: 'think' as const, answers: {}, choices: {}, earlyStart: false, thinkResponses: {} }));
 function enrolled(extra: Partial<AppData> = {}): AppData {
-  return { ...emptyData(), onboardingCompletedAt: now(), programme: { startedAt: now(), disclaimerSeenAt: now(), maintenanceStartedAt: null }, ...extra };
+  return { ...emptyData(), onboardingCompletedAt: now(), programme: { startedAt: now(), disclaimerSeenAt: now(), maintenanceStartedAt: null, noticeDismissedAt: now() }, ...extra };
 }
 
 beforeEach(() => go('#/'));
@@ -119,7 +119,7 @@ describe('Today and sessions', () => {
 
   it('says "pick up where you left off" after a gap, with no penalty', async () => {
     const old = new Date(Date.now() - 5 * 86400000).toISOString();
-    seed(enrolled({ programme: { startedAt: old, disclaimerSeenAt: old, maintenanceStartedAt: null }, sessions: ses('w0d0').map((s) => ({ ...s, completedAt: old })) }));
+    seed(enrolled({ programme: { startedAt: old, disclaimerSeenAt: old, maintenanceStartedAt: null, noticeDismissedAt: null }, sessions: ses('w0d0').map((s) => ({ ...s, completedAt: old })) }));
     render(<App />);
     expect(await screen.findByText(/Pick up where you left off/)).toBeInTheDocument();
     expect(screen.getByText('Week 1 · Day 1 of 42')).toBeInTheDocument();
@@ -189,7 +189,7 @@ describe('settings: reminder and backup', () => {
     expect(screen.getByTestId('last-export')).not.toHaveTextContent('never');
   });
   it('nudges a backup after 7 days of use, and can be dismissed', async () => {
-    const plans = Array.from({ length: 7 }, (_, i) => { const date = addDays(dateKey(), -i - 1); return { id: `p${i}`, date, domain: null, when: 'a', then: 'b', outcome: null, note: '', createdAt: `${date}T10:00:00.000Z`, updatedAt: `${date}T10:00:00.000Z` }; });
+    const plans = Array.from({ length: 7 }, (_, i) => { const date = addDays(dateKey(), -i - 1); return { id: `p${i}`, date, domain: null, valueId: null, when: 'a', then: 'b', outcome: null, note: '', createdAt: `${date}T10:00:00.000Z`, updatedAt: `${date}T10:00:00.000Z` }; });
     seed(enrolled({ plans }));
     const u = userEvent.setup();
     render(<App />);

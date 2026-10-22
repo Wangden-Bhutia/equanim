@@ -1,6 +1,6 @@
 import { DOMAIN_IDS, type AppData, type DomainId } from '../types';
 
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 export const MAX_TEXT = 20000;
 
 export function emptyData(now: Date = new Date()): AppData {
@@ -163,7 +163,23 @@ export const MIGRATIONS: Record<number, Migration> = {
       : p ?? null;
     return { ...d, schemaVersion: 4, programme };
   },
+  4: (d) => {
+    // Round 2: calendar pacing, think responses, catch-up reviews, values on plans, inline notice. Additive only.
+    // Existing completions are never re-dated or gated retroactively: earlyStart defaults to false.
+    const fill = (v: unknown, extra: Json): unknown[] => arr(v).map((x) => (isObjJ(x) ? { ...extra, ...x } : x));
+    const p = d.programme;
+    const programme = isObjJ(p) ? { noticeDismissedAt: p.disclaimerSeenAt ?? null, ...p } : p ?? null;
+    return {
+      ...d,
+      schemaVersion: 5,
+      programme,
+      sessions: fill(d.sessions, { earlyStart: false, thinkResponses: {} }),
+      reviews: fill(d.reviews, { catchUp: false }),
+      plans: fill(d.plans, { valueId: null }),
+    };
+  },
 };
+const isObjJ = (v: unknown): v is Json => typeof v === 'object' && v !== null && !Array.isArray(v);
 
 export class MigrationError extends Error {}
 
@@ -195,6 +211,7 @@ const isId = (v: unknown): v is string => typeof v === 'string' && v.length > 0 
 const isStrMap = (v: unknown, max = MAX_TEXT) => isObj(v) && Object.entries(v).every(([k, x]) => k.length <= 60 && isStr(x, max));
 const isOptIso = (v: unknown) => v === null || isIso(v);
 const isTime = (v: unknown) => v === null || (typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v));
+const THINK = ['have-one', 'not-sure', 'nothing'];
 const CATEGORIES = ['speak-carefully', 'separate-observation', 'ask-before-assuming', 'pause-before-responding', 'sincere-effort', 'custom'];
 
 const isLegacyCheckIn = (v: unknown) =>
@@ -220,7 +237,8 @@ const RECORD_CHECKS: Record<string, (x: Json) => boolean> = {
   library: (x) => isId(x.itemId) && ['opened', 'completed', 'exercise'].includes(String(x.kind)) && isIso(x.at),
   sessions: (x) =>
     isId(x.id) && isId(x.sessionId) && isIso(x.completedAt) && isIso(x.updatedAt) && (x.mode === 'think' || x.mode === 'write') &&
-    isStrMap(x.answers) && isStrMap(x.choices, 120),
+    isStrMap(x.answers) && isStrMap(x.choices, 120) && typeof x.earlyStart === 'boolean' &&
+    isObj(x.thinkResponses) && Object.entries(x.thinkResponses).every(([k, v]) => k.length <= 60 && THINK.includes(String(v))),
   values: (x) => isId(x.id) && isStr(x.sentence, 500) && isIso(x.updatedAt),
   baselines: (x) =>
     isId(x.id) && (x.kind === 'start' || x.kind === 'finish' || x.kind === 'checkin') && isObj(x.ratings) &&
@@ -228,9 +246,9 @@ const RECORD_CHECKS: Record<string, (x: Json) => boolean> = {
     Array.isArray(x.situations) && x.situations.length <= 5 && x.situations.every((t) => isStr(t, 4000)) && isIso(x.completedAt) && isIso(x.updatedAt),
   reviews: (x) =>
     isId(x.id) && Number.isInteger(x.week) && (x.week as number) >= 1 && (x.week as number) <= 6 && isStr(x.worked) && isStr(x.gotInWay) && isStr(x.noticed) &&
-    (x.rating === null || (Number.isInteger(x.rating) && (x.rating as number) >= 1 && (x.rating as number) <= 5)) && isIso(x.completedAt) && isIso(x.updatedAt),
+    (x.rating === null || (Number.isInteger(x.rating) && (x.rating as number) >= 1 && (x.rating as number) <= 5)) && typeof x.catchUp === 'boolean' && isIso(x.completedAt) && isIso(x.updatedAt),
   plans: (x) =>
-    isId(x.id) && isDateKey(x.date) && (x.domain === null || isDomain(x.domain)) && isStr(x.when, 300) && isStr(x.then, 300) &&
+    isId(x.id) && isDateKey(x.date) && (x.domain === null || isDomain(x.domain)) && (x.valueId === null || isStr(x.valueId, 60)) && isStr(x.when, 300) && isStr(x.then, 300) &&
     (x.outcome === null || ['not-came-up', 'tried', 'didnt-manage'].includes(String(x.outcome))) && isStr(x.note) && isIso(x.createdAt) && isIso(x.updatedAt),
   recall: (x) =>
     isId(x.id) && isDateKey(x.firstSeen) && Array.isArray(x.reviewed) && x.reviewed.length <= 50 && x.reviewed.every(isDateKey) &&
@@ -240,7 +258,7 @@ const COLLECTIONS = Object.keys(RECORD_CHECKS);
 const isSettings = (s: unknown) =>
   isObj(s) && isStr(s.displayName, 80) && typeof s.streaksEnabled === 'boolean' && ['system', 'light', 'dark'].includes(String(s.theme)) &&
   isOptIso(s.lastExportAt) && (s.backupNudgeDismissedOn === null || isDateKey(s.backupNudgeDismissedOn)) && isTime(s.reminderTime);
-const isProgramme = (p: unknown) => p === null || (isObj(p) && isIso(p.startedAt) && isOptIso(p.disclaimerSeenAt) && isOptIso(p.maintenanceStartedAt));
+const isProgramme = (p: unknown) => p === null || (isObj(p) && isIso(p.startedAt) && isOptIso(p.disclaimerSeenAt) && isOptIso(p.maintenanceStartedAt) && isOptIso(p.noticeDismissedAt));
 const isInProgress = (ip: unknown) =>
   ip === null || (isObj(ip) && (ip.kind === 'scenario' || ip.kind === 'practice') && isId(ip.refId) && isIso(ip.startedAt) && isStr(ip.draft));
 

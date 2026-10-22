@@ -13,9 +13,9 @@ import { DOMAIN_IDS, type AppData } from '../../src/types';
 const at = (day: string, h = 9) => `${day}T0${h}:00:00`;
 const done = (d: AppData, ...ids: string[]): AppData => ({
   ...d,
-  sessions: [...d.sessions, ...ids.map((id) => ({ id: `ses_${id}`, sessionId: id, completedAt: new Date(at('2026-10-20')).toISOString(), updatedAt: new Date(at('2026-10-20')).toISOString(), mode: 'think' as const, answers: {}, choices: {} }))],
+  sessions: [...d.sessions, ...ids.map((id) => ({ id: `ses_${id}`, sessionId: id, completedAt: new Date(at('2026-10-20')).toISOString(), updatedAt: new Date(at('2026-10-20')).toISOString(), mode: 'think' as const, answers: {}, choices: {}, earlyStart: false, thinkResponses: {} }))],
 });
-const enrolled = (): AppData => ({ ...emptyData(), programme: { startedAt: new Date(at('2026-10-20')).toISOString(), disclaimerSeenAt: null, maintenanceStartedAt: null } });
+const enrolled = (): AppData => ({ ...emptyData(), programme: { startedAt: new Date(at('2026-10-20')).toISOString(), disclaimerSeenAt: null, maintenanceStartedAt: null, noticeDismissedAt: null } });
 
 describe('programme engine: order and unlocking', () => {
   it('has Day 0 and six sessions in each of six weeks (Day 7 is rest)', () => {
@@ -106,7 +106,7 @@ describe('calendar reminder (.ics)', () => {
 
 describe('backup nudge', () => {
   const days = (n: number, from = 1) => Array.from({ length: n }, (_, i) => `2026-10-${String(from + i).padStart(2, '0')}`);
-  const withPlans = (ds: string[]): AppData => ({ ...emptyData(), plans: ds.map((date, i) => ({ id: `p${i}`, date, domain: null, when: 'a', then: 'b', outcome: null, note: '', createdAt: `${date}T10:00:00.000Z`, updatedAt: `${date}T10:00:00.000Z` })) });
+  const withPlans = (ds: string[]): AppData => ({ ...emptyData(), plans: ds.map((date, i) => ({ id: `p${i}`, date, domain: null, valueId: null, when: 'a', then: 'b', outcome: null, note: '', createdAt: `${date}T10:00:00.000Z`, updatedAt: `${date}T10:00:00.000Z` })) });
   it('appears after 7 days of use without an export, and not before', () => {
     expect(shouldNudgeBackup(withPlans(days(6)))).toBe(false);
     expect(shouldNudgeBackup(withPlans(days(7)))).toBe(true);

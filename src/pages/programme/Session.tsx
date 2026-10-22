@@ -11,6 +11,7 @@ import { ChoiceItem, ModeToggle } from '../../components/programme';
 import { DomainTag, PageHeader } from '../../components/ui';
 import { Confirmation } from '../../components/Confirmation';
 import { NotFound } from '../NotFound';
+import { Paced } from '../../components/pacing';
 import type { SessionMode } from '../../types';
 
 function typeLabel(s: SessionDef) {
@@ -79,6 +80,7 @@ export function Session() {
   );
 
   return (
+    <Paced sessionId={s.id} title={<PageHeader eyebrow={eyebrow} title={s.title} back="/" />}>
     <article className="space-y-4">
       <PageHeader eyebrow={eyebrow} title={s.title} back={onboarded ? '/' : '/welcome'} intro={s.intro} />
       {s.domain && <DomainTag domain={s.domain} />}
@@ -152,7 +154,7 @@ export function Session() {
       {done ? (
         <div className={`card ${justDone ? 'completion-moment' : ''}`}>
           <Confirmation focus={justDone} className="flex items-center gap-2 font-medium text-accent"><Check size={18} aria-hidden="true" />{doneAtStart && !justDone ? 'Completed. You can revisit it any time.' : 'Session complete'}</Confirmation>
-          {justDone && !doneAtStart && !isTaster && <p className="text-muted text-[15px] mt-2">Nice work. The next session opens now, whenever you are ready: today, tomorrow or later.</p>}
+          {justDone && !doneAtStart && !isTaster && <p className="text-muted text-[15px] mt-2">Nice work. The next session opens tomorrow, and any day after that is fine too.</p>}
           {doneAtStart && justDone && <p className="text-muted text-[15px] mt-2">Your changes were saved.</p>}
           <div className="mt-4 flex flex-wrap gap-3">
             {isTaster && !onboarded ? <Link to="/welcome" className="btn-primary">Back to the welcome<ArrowRight size={16} aria-hidden="true" /></Link>
@@ -166,5 +168,6 @@ export function Session() {
         <button className="btn-primary w-full sm:w-auto" onClick={finish}>Complete session</button>
       )}
     </article>
+    </Paced>
   );
 }

@@ -66,6 +66,38 @@ export function sessionDef(sessionId: string): SessionDef | null {
   return SESSION_BY_ID[sessionId] ?? null;
 }
 
+// ---------- Calendar pacing (schema v5) ----------
+
+const IN_ORDER = new Set(ORDER);
+
+/** True when a programme session was completed for the first time on this local day. */
+export function doneNewOn(d: AppData, day: string): boolean {
+  return d.sessions.some((s) => IN_ORDER.has(s.sessionId) && keyFromIso(s.completedAt) === day);
+}
+
+/**
+ * One new session per calendar day. Returns the day key the next session opens on, or null when it is open now.
+ * A gap never matters: the check only looks at today, so after any absence the next session is simply open.
+ */
+export function opensOn(d: AppData, today: string): string | null {
+  if (currentSessionId(d) === null || inMaintenance(d)) return null;
+  return doneNewOn(d, today) ? addDays(today, 1) : null;
+}
+
+/** Would completing this session now be ahead of schedule? Only a first completion of a programme session can be. */
+export function wouldBeEarly(d: AppData, sessionId: string, today: string): boolean {
+  return IN_ORDER.has(sessionId) && !isDone(d, sessionId) && doneNewOn(d, today);
+}
+
+/** Sessions the user chose to do ahead of schedule ("Do the next one now anyway"). */
+export const earlyCount = (d: AppData) => d.sessions.filter((s) => s.earlyStart).length;
+
+/** "Thursday 23 October", for "opens tomorrow" lines. */
+export function dayLabel(key: string, opts: Intl.DateTimeFormatOptions = { weekday: 'long', day: 'numeric', month: 'long' }): string {
+  const [y, m, dd] = key.split('-').map(Number) as [number, number, number];
+  return new Date(y, m - 1, dd).toLocaleDateString(undefined, opts);
+}
+
 /** When the user has been away for more than a day, Today says "pick up where you left off". Never a penalty. */
 export function isReturning(d: AppData, today: string): boolean {
   if (!d.programme) return false;

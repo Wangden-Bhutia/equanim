@@ -4,12 +4,13 @@ import { ArrowRight, Check, ChevronDown, CloudDownload, MessageCircle, Moon, Not
 import { useStore } from '../../app/store';
 import { PHRASE_BANKS, DAY0_ID, DAY_TYPES, DIDNT_MANAGE_RESPONSE, EVENING_QUESTION, INDEPENDENCE_TEXT, OUTCOME_LABELS, RETRIEVAL_BY_ID, SESSION_BY_ID } from '../../data/programme';
 import { dateKey, formatLongDate, keyFromIso } from '../../engine/dates';
-import { MAINTENANCE_PER_WEEK, checkinDue, currentSessionId, daysPractisedThisWeek, dueRecall, inMaintenance, isReturning, pathProgress, sessionRoute, shouldNudgeBackup, weekDayLabel } from '../../engine/programme';
+import { MAINTENANCE_PER_WEEK, checkinDue, currentSessionId, daysPractisedThisWeek, dueRecall, inMaintenance, isReturning, opensOn, pathProgress, sessionRoute, shouldNudgeBackup, weekDayLabel } from '../../engine/programme';
 import { SCENARIO_BY_ID } from '../../data/scenarios';
 import { activityDays, suggestScenarioId } from '../../engine/progress';
 import { ChoiceItem, ProgrammeChip } from '../../components/programme';
 import { Dialog } from '../../components/ui';
 import { Confirmation } from '../../components/Confirmation';
+import { EarlyStart, OpensLine, useEarlyGo } from '../../components/pacing';
 import { ContinueCard, DailyPracticeCard, EveningReflection, Intention, ScenarioOfTheDay } from '../Today';
 import { practiceForDay } from '../../engine/progress';
 import { dayIndex } from '../../engine/dates';
@@ -62,6 +63,7 @@ function MaintenanceCard() {
 
 function SessionCard() {
   const { data, startMaintenance } = useStore();
+  const goEarly = useEarlyGo();
   const cur = currentSessionId(data);
   const today = dateKey();
   const doneToday = data.sessions.filter((s) => keyFromIso(s.completedAt) === today && s.sessionId !== 'taster');
@@ -91,14 +93,25 @@ function SessionCard() {
     );
   }
   const { title, meta } = sessionTitle(cur);
-  const isRest = doneToday.length > 0;
+  const opens = opensOn(data, today);
+  if (opens) {
+    return (
+      <section className="card" aria-labelledby="ses-h" data-testid="session-gated">
+        <p className="eyebrow">Next session</p>
+        <h2 id="ses-h" className="font-serif text-[22px] font-semibold mt-1">{title}</h2>
+        <p className="text-muted text-[14.5px] mt-1">{meta}</p>
+        {doneToday.length > 0 && <p className="text-[15px] mt-2 flex gap-2 items-center"><Check size={17} className="text-accent" aria-hidden="true" />Today’s session is done.</p>}
+        <div className="mt-2"><OpensLine day={opens} /></div>
+        <EarlyStart className="mt-3" onGo={() => goEarly(sessionRoute(cur, data))} />
+      </section>
+    );
+  }
   return (
-    <section className="card border-accent/40" aria-labelledby="ses-h">
-      <p className="eyebrow">{isRest ? 'Next session · whenever you are ready' : 'Today’s session'}</p>
+    <section className="card border-accent/40" aria-labelledby="ses-h" data-testid="session-ready">
+      <p className="eyebrow">Today’s session</p>
       <h2 id="ses-h" className="font-serif text-[22px] font-semibold mt-1">{title}</h2>
       <p className="text-muted text-[14.5px] mt-1">{meta}</p>
-      {isRest && <p className="text-[15px] mt-2 flex gap-2 items-center"><Check size={17} className="text-accent" aria-hidden="true" />You did a session today. The next one is open, but one a day is plenty.</p>}
-      <Link to={sessionRoute(cur, data)} className={`${isRest ? 'btn-secondary' : 'btn-primary'} mt-4`}><PlayCircle size={18} aria-hidden="true" />{isRest ? 'Start next session' : 'Start session'}</Link>
+      <Link to={sessionRoute(cur, data)} className="btn-primary mt-4"><PlayCircle size={18} aria-hidden="true" />Start session</Link>
     </section>
   );
 }
@@ -240,7 +253,7 @@ export function ProgrammeToday() {
             <Link to="/programme" aria-label={`${weekDayLabel(cur)}. Open the programme`}><ProgrammeChip label={weekDayLabel(cur)} progress={pathProgress(data)} /></Link>
           )}
         </div>
-        {justFinishedDay0 && <p role="status" className="mt-3 text-[15px]">Day 0 is done. Week 1 starts whenever you are ready.</p>}
+        {justFinishedDay0 && <p role="status" className="mt-3 text-[15px]">Day 0 is done. Week 1 starts tomorrow, or any day after that.</p>}
         {isReturning(data, today) && <p className="mt-3 text-[15px] rounded-xl bg-accentsoft px-3 py-2">Welcome back. Pick up where you left off: nothing has been lost, and there is no catching up to do.</p>}
       </section>
       <SessionCard />

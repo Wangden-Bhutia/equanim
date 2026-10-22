@@ -8,6 +8,7 @@ import { isUnlocked, weekDayLabel } from '../../engine/programme';
 import { PageHeader } from '../../components/ui';
 import { Confirmation } from '../../components/Confirmation';
 import { NotFound } from '../NotFound';
+import { Paced } from '../../components/pacing';
 
 export function Review() {
   const { week: w = '' } = useParams();
@@ -32,6 +33,7 @@ export function Review() {
   plans.forEach((p) => { if (p.outcome) counts[p.outcome] += 1; });
 
   return (
+    <Paced sessionId={sid} title={header}>
     <div className="space-y-4">
       {header}
       <section className="card" aria-labelledby="rv-plans">
@@ -75,5 +77,6 @@ export function Review() {
         </div>
       )}
     </div>
+    </Paced>
   );
 }

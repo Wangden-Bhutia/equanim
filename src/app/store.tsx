@@ -5,11 +5,11 @@ import {
 } from '../storage/storage';
 import { emptyData } from '../storage/schema';
 import { mergeData } from '../storage/transfer';
-import { dateKey } from '../engine/dates';
+import { dateKey, keyFromIso } from '../engine/dates';
 import { newId } from '../engine/id';
 import type { AppData, DomainId, EveningReflection, IntentionCategory, JournalEntry, PlanOutcome, SessionMode, Settings } from '../types';
 import { DAY0_ID } from '../data/programme';
-import { recordRecall, sessionRecordId } from '../engine/programme';
+import { recordRecall, sessionRecordId, wouldBeEarly } from '../engine/programme';
 
 export type JournalDraft = Omit<JournalEntry, 'id' | 'createdAt' | 'updatedAt'>;
 export type ReflectionDraft = Pick<EveningReflection, 'happened' | 'initial' | 'did' | 'alternative' | 'nextTime'>;
@@ -63,9 +63,9 @@ interface StoreValue {
   startMaintenance: () => void;
   saveValues: (choices: { id: string; sentence: string }[]) => void;
   saveBaseline: (kind: 'start' | 'finish' | 'checkin', ratings: Record<string, number>, situations: string[]) => void;
-  completeSession: (sessionId: string, mode: SessionMode, answers: Record<string, string>, choices?: Record<string, string>) => void;
-  saveReview: (week: number, review: { worked: string; gotInWay: string; noticed: string; rating: number | null }) => void;
-  savePlan: (plan: { when: string; then: string; domain: DomainId | null }) => void;
+  completeSession: (sessionId: string, mode: SessionMode, answers: Record<string, string>, choices?: Record<string, string>, thinkResponses?: Record<string, string>) => void;
+  saveReview: (week: number, review: { worked: string; gotInWay: string; noticed: string; rating: number | null; catchUp?: boolean }) => void;
+  savePlan: (plan: { when: string; then: string; domain: DomainId | null; valueId?: string | null }) => void;
   checkPlan: (outcome: PlanOutcome, note: string) => void;
   answerRecall: (questionId: string, correct: boolean) => void;
   markExported: () => void;
@@ -79,11 +79,20 @@ const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
 const StoreContext = createContext<StoreValue | null>(null);
 
 /** Marks a session complete. Completing again keeps the first completion time and updates the answers. */
-function withSession(d: AppData, sessionId: string, mode: SessionMode, answers: Record<string, string>, choices: Record<string, string>, t: string): AppData {
+/**
+ * A first completion on a day when another programme session was already done is recorded as earlyStart: the
+ * user chose "Do the next one now anyway". The flag is fixed at first completion and never changes on later edits.
+ */
+export function withSession(d: AppData, sessionId: string, mode: SessionMode, answers: Record<string, string>, choices: Record<string, string>, t: string, thinkResponses: Record<string, string> = {}): AppData {
   const id = sessionRecordId(sessionId);
   const prev = d.sessions.find((s) => s.id === id);
   const clean = Object.fromEntries(Object.entries(answers).map(([k, v]) => [k, v.trim()]).filter(([, v]) => v));
-  const rec = { id, sessionId, completedAt: prev?.completedAt ?? t, updatedAt: t, mode, answers: { ...(prev?.answers ?? {}), ...clean }, choices: { ...(prev?.choices ?? {}), ...choices } };
+  const earlyStart = prev ? prev.earlyStart : wouldBeEarly(d, sessionId, keyFromIso(t));
+  const rec = {
+    id, sessionId, completedAt: prev?.completedAt ?? t, updatedAt: t, mode,
+    answers: { ...(prev?.answers ?? {}), ...clean }, choices: { ...(prev?.choices ?? {}), ...choices },
+    earlyStart, thinkResponses: { ...(prev?.thinkResponses ?? {}), ...thinkResponses },
+  };
   return { ...d, sessions: prev ? d.sessions.map((s) => (s.id === id ? rec : s)) : [...d.sessions, rec] };
 }
 
@@ -347,11 +356,11 @@ export function StoreProvider({ children, adapter, locks, channel }: {
 
     startProgramme: () => {
       const t = now();
-      update((d) => (d.programme ? d : { ...d, programme: { startedAt: t, disclaimerSeenAt: null, maintenanceStartedAt: null } }));
+      update((d) => (d.programme ? d : { ...d, programme: { startedAt: t, disclaimerSeenAt: null, maintenanceStartedAt: null, noticeDismissedAt: null } }));
     },
     startMaintenance: () => {
       const t = now();
-      update((d) => ({ ...d, programme: { startedAt: d.programme?.startedAt ?? t, disclaimerSeenAt: d.programme?.disclaimerSeenAt ?? t, maintenanceStartedAt: d.programme?.maintenanceStartedAt ?? t } }));
+      update((d) => ({ ...d, programme: { startedAt: d.programme?.startedAt ?? t, disclaimerSeenAt: d.programme?.disclaimerSeenAt ?? t, maintenanceStartedAt: d.programme?.maintenanceStartedAt ?? t, noticeDismissedAt: d.programme?.noticeDismissedAt ?? null } }));
     },
     markDisclaimerSeen: () => {
       const t = now();
@@ -380,16 +389,16 @@ export function StoreProvider({ children, adapter, locks, channel }: {
         return next;
       });
     },
-    completeSession: (sessionId, mode, answers, choices = {}) => {
+    completeSession: (sessionId, mode, answers, choices = {}, thinkResponses = {}) => {
       const t = now();
-      update((d) => withSession(d, sessionId, mode, answers, choices, t));
+      update((d) => withSession(d, sessionId, mode, answers, choices, t, thinkResponses));
     },
     saveReview: (week, review) => {
       const t = now();
       const id = `rev_w${week}`;
       update((d) => {
         const prev = d.reviews.find((r) => r.id === id);
-        const rec = { id, week, worked: review.worked.trim(), gotInWay: review.gotInWay.trim(), noticed: review.noticed.trim(), rating: review.rating, completedAt: prev?.completedAt ?? t, updatedAt: t };
+        const rec = { id, week, worked: review.worked.trim(), gotInWay: review.gotInWay.trim(), noticed: review.noticed.trim(), rating: review.rating, catchUp: prev ? prev.catchUp && (review.catchUp ?? false) : review.catchUp ?? false, completedAt: prev?.completedAt ?? t, updatedAt: t };
         const next = { ...d, reviews: prev ? d.reviews.map((r) => (r.id === id ? rec : r)) : [...d.reviews, rec] };
         return withSession(next, `w${week}d6`, 'write', {}, {}, t);
       });
@@ -398,8 +407,8 @@ export function StoreProvider({ children, adapter, locks, channel }: {
       const t = now();
       const id = newId('pln');
       replaceForDay<AppData['plans'][number]>('plans', (x) =>
-        x ? { ...x, when: plan.when.trim(), then: plan.then.trim(), domain: plan.domain, updatedAt: t }
-          : { id, date: dateKey(), domain: plan.domain, when: plan.when.trim(), then: plan.then.trim(), outcome: null, note: '', createdAt: t, updatedAt: t });
+        x ? { ...x, when: plan.when.trim(), then: plan.then.trim(), domain: plan.domain, valueId: plan.valueId ?? null, updatedAt: t }
+          : { id, date: dateKey(), domain: plan.domain, valueId: plan.valueId ?? null, when: plan.when.trim(), then: plan.then.trim(), outcome: null, note: '', createdAt: t, updatedAt: t });
     },
     checkPlan: (outcome, note) => {
       const t = now();
